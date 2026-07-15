@@ -25,9 +25,9 @@ export function Nav() {
   const router = useRouter();
   const pathname = usePathname();
   const { loggedIn, logout } = useAuth();
-  const { plans } = usePlanner();
+  const { totalPlans } = usePlanner();
   const isSubAdmin = useIsSubAdmin();
-  const planCount = plans.length;
+  const planCount = totalPlans;
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showLoginRequired, setShowLoginRequired] = useState(false);
@@ -97,8 +97,8 @@ export function Nav() {
           </button>
           {loggedIn ? (
             <button
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 router.push("/goods");
               }}
               className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-border text-muted-foreground hover:text-foreground text-sm font-semibold rounded-lg transition-colors"
@@ -166,8 +166,8 @@ export function Nav() {
             <div className="pt-2 pb-1">
               {loggedIn ? (
                 <button
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    await logout();
                     setMobileOpen(false);
                     router.push("/goods");
                   }}

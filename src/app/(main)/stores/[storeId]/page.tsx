@@ -1,14 +1,26 @@
 import { notFound } from "next/navigation";
-import { getAnimations, getGoodsByStoreId } from "@/features/goods/api";
-import { getStoreById } from "@/features/store/api";
+import { safeFetch } from "@/lib/apiClient";
+import { getStoreById, getStoreGoods } from "@/features/store/api";
 import { StoreDetailClient } from "./StoreDetailClient";
 
 export default async function StoreDetailPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
-  const store = await getStoreById(Number(storeId));
-  if (!store) notFound();
 
-  const [storeGoods, animations] = await Promise.all([getGoodsByStoreId(store.id), getAnimations()]);
+  const storeResult = await safeFetch(getStoreById(Number(storeId)), null);
+  if (storeResult.error) {
+    return (
+      <div className="min-h-screen bg-background pt-14 md:pt-16 flex items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          <p className="text-sm text-red-400 font-medium mb-2">업체 정보를 불러오지 못했습니다</p>
+          <p className="text-xs text-muted-foreground">{storeResult.error}</p>
+        </div>
+      </div>
+    );
+  }
+  // getStoreById는 404일 때만 null을 반환(그 외 에러는 위에서 이미 처리)
+  if (!storeResult.data) notFound();
 
-  return <StoreDetailClient store={store} storeGoods={storeGoods} animations={animations} />;
+  const goodsResult = await safeFetch(getStoreGoods(storeResult.data.id), []);
+
+  return <StoreDetailClient store={storeResult.data} storeGoods={goodsResult.data} storeGoodsError={goodsResult.error} />;
 }

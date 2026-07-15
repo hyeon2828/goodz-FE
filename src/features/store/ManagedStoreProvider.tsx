@@ -1,11 +1,16 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
-import { genUid } from "@/lib/helpers";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@/features/auth/AuthProvider";
-import type { ManagedStore, StoreType } from "@/types/domain";
+import { createStore, getManagedStores, updateStore as updateStoreRequest } from "./adminApi";
+import type { StoreData, StoreType } from "@/types/domain";
 
-interface NewStoreInput {
+interface ActionResult {
+  success: boolean;
+  message: string;
+}
+
+interface StoreInput {
   name: string;
   address: string;
   type: StoreType;
@@ -15,50 +20,64 @@ interface NewStoreInput {
 }
 
 interface ManagedStoreContextValue {
-  managedStores: ManagedStore[];
-  addStore: (input: NewStoreInput) => void;
-  updateStore: (uid: string, updates: Partial<ManagedStore>) => void;
+  managedStores: StoreData[];
+  loading: boolean;
+  refreshStores: () => Promise<void>;
+  addStore: (input: StoreInput) => Promise<ActionResult>;
+  updateStore: (storeId: number, updates: StoreInput) => Promise<ActionResult>;
 }
 
 const ManagedStoreContext = createContext<ManagedStoreContextValue | null>(null);
 
 export function ManagedStoreProvider({ children }: { children: ReactNode }) {
-  const [managedStores, setManagedStores] = useState<ManagedStore[]>([]);
+  const { loggedIn } = useAuth();
+  const [managedStores, setManagedStores] = useState<StoreData[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // features/goods/api.ts, features/store/api.ts와 달리 이 mutation들은
-  // 아직 api.ts 스타일 래퍼를 안 거침 — 영속시킬 백엔드가 없어 로컬
-  // Context state에 직접 기록.
-  //
-  // TODO(백엔드 연동): addStore/updateStore가 관리자 대시보드의 모든
-  // 쓰기 동작(업체 추가, 굿즈 수정, 서브관리자 추가/삭제 등)의 실제
-  // 처리 지점. Spring Boot API 생기면 이 함수들을 POST/PUT 호출하는
-  // `async` 함수로 교체 필요, 이때 모든 요청에 로그인 사용자의 JWT
-  // 반드시 포함(Authorization 헤더 또는 AuthProvider가 최종 채택할
-  // 방식에 맞춘 인증 쿠키) — 이 대시보드는 업체주/서브관리자 전용이라
-  // 클라이언트가 뭘 보내든 서버에서 미인증 쓰기는 거부해야 함.
-  const addStore = (input: NewStoreInput) => {
-    setManagedStores((prev) => [
-      ...prev,
-      {
-        uid: genUid(),
-        name: input.name,
-        address: input.address,
-        type: input.type,
-        startDate: input.type === "popup" ? input.startDate : undefined,
-        endDate: input.type === "popup" ? input.endDate : undefined,
-        description: input.description,
-        subAdmins: [],
-        goods: [],
-      },
-    ]);
+  const refreshStores = async () => {
+    setLoading(true);
+    const result = await getManagedStores();
+    if (result.success && result.data) setManagedStores(result.data);
+    setLoading(false);
   };
 
-  const updateStore = (uid: string, updates: Partial<ManagedStore>) => {
-    setManagedStores((prev) => prev.map((s) => (s.uid === uid ? { ...s, ...updates } : s)));
+  useEffect(() => {
+    if (loggedIn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      refreshStores();
+    } else {
+      setManagedStores([]);
+    }
+  }, [loggedIn]);
+
+  const addStore = async (input: StoreInput): Promise<ActionResult> => {
+    const result = await createStore({
+      name: input.name,
+      description: input.description,
+      type: input.type,
+      startDate: input.type === "popup" ? input.startDate : undefined,
+      endDate: input.type === "popup" ? input.endDate : undefined,
+      address: input.address,
+    });
+    if (result.success) await refreshStores();
+    return { success: result.success, message: result.message };
+  };
+
+  const updateStore = async (storeId: number, updates: StoreInput): Promise<ActionResult> => {
+    const result = await updateStoreRequest(storeId, {
+      name: updates.name,
+      description: updates.description,
+      type: updates.type,
+      startDate: updates.type === "popup" ? updates.startDate : undefined,
+      endDate: updates.type === "popup" ? updates.endDate : undefined,
+      address: updates.address,
+    });
+    if (result.success) await refreshStores();
+    return { success: result.success, message: result.message };
   };
 
   return (
-    <ManagedStoreContext.Provider value={{ managedStores, addStore, updateStore }}>
+    <ManagedStoreContext.Provider value={{ managedStores, loading, refreshStores, addStore, updateStore }}>
       {children}
     </ManagedStoreContext.Provider>
   );
@@ -70,8 +89,12 @@ export function useManagedStores() {
   return ctx;
 }
 
+// GET /stores/admin이 role과 무관하게 "내가 관리하는 업체"를 서버에서
+// 이미 스코핑해서 내려줌 — user(개인) role이 이 목록에 하나라도 있다는
+// 건 어딘가의 서브 관리자로 배정됐다는 뜻(개인 role은 업체를 직접 소유할
+// 수 없으므로).
 export function useIsSubAdmin() {
-  const { userRole, userEmail } = useAuth();
+  const { userRole } = useAuth();
   const { managedStores } = useManagedStores();
-  return userRole === "user" && managedStores.some((s) => s.subAdmins.includes(userEmail));
+  return userRole === "user" && managedStores.length > 0;
 }

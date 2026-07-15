@@ -3,20 +3,17 @@
 import { Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { useAuth } from "@/features/auth/AuthProvider";
+import { verifyEmail } from "@/features/auth/api";
 import { AuthShell } from "@/features/auth/components/AuthShell";
-import type { UserRole } from "@/types/domain";
 
 function VerifyEmailForm() {
   const router = useRouter();
-  const { login } = useAuth();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "";
-  const role = (searchParams.get("role") as UserRole | null) ?? "user";
 
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [verifyState, setVerifyState] = useState<"idle" | "error" | "success">("idle");
-  const [resent, setResent] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const codeRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   const handleCodeChange = (i: number, val: string) => {
@@ -37,27 +34,20 @@ function VerifyEmailForm() {
       codeRefs[5].current?.focus();
     }
   };
-  const handleVerify = () => {
-    if (code.join("") === "123456") {
+  const handleVerify = async () => {
+    const result = await verifyEmail({ email, authCode: code.join("") });
+    if (result.success) {
       setVerifyState("success");
-      setTimeout(() => {
-        login(role, email);
-        router.push("/");
-      }, 800);
+      // verify-email은 이메일 인증만 확인할 뿐 토큰을 안 돌려줌 —
+      // 실제 로그인은 이 방금 만든 계정으로 별도로 해야 함.
+      setTimeout(() => router.push("/login"), 800);
     } else {
       setVerifyState("error");
+      setErrorMessage(result.message || "인증번호가 올바르지 않습니다");
       setCode(["", "", "", "", "", ""]);
       codeRefs[0].current?.focus();
     }
   };
-  const handleResend = () => {
-    setResent(true);
-    setCode(["", "", "", "", "", ""]);
-    setVerifyState("idle");
-    codeRefs[0].current?.focus();
-    setTimeout(() => setResent(false), 3000);
-  };
-
   return (
     <AuthShell>
       <div className="bg-card border border-border rounded-2xl p-6 md:p-7">
@@ -102,9 +92,8 @@ function VerifyEmailForm() {
           ))}
         </div>
         <div className="h-5 text-center mb-4">
-          {verifyState === "error" && <p className="text-xs text-red-400 font-medium">인증번호가 올바르지 않습니다</p>}
-          {verifyState === "success" && <p className="text-xs text-emerald-400 font-medium">인증 성공! 이동 중...</p>}
-          {resent && <p className="text-xs text-violet-400 font-medium">인증번호를 재발송했습니다</p>}
+          {verifyState === "error" && <p className="text-xs text-red-400 font-medium">{errorMessage}</p>}
+          {verifyState === "success" && <p className="text-xs text-emerald-400 font-medium">인증 성공! 로그인 페이지로 이동 중...</p>}
         </div>
         <button
           onClick={handleVerify}
@@ -116,11 +105,10 @@ function VerifyEmailForm() {
         <div className="text-center mt-4">
           <p className="text-xs text-muted-foreground">
             인증번호를 받지 못했나요?{" "}
-            <button onClick={handleResend} className="text-violet-400 hover:text-violet-300 font-semibold transition-colors">
-              다시 보내기
-            </button>
+            <span className="text-muted-foreground/50 cursor-not-allowed" title="재발송 기능은 준비 중입니다">
+              다시 보내기 (준비 중)
+            </span>
           </p>
-          <p className="text-[10px] text-muted-foreground/40 mt-3 font-mono">프로토타입 인증번호: 123456</p>
         </div>
       </div>
     </AuthShell>

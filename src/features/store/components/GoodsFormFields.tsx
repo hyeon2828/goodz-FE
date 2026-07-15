@@ -1,27 +1,27 @@
 "use client";
 
-import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useEffect, useMemo, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { Plus, X } from "lucide-react";
 import type { AnimationData } from "@/types/domain";
 import { AnimCombobox } from "./AnimCombobox";
-import { CategoryCombobox } from "./CategoryCombobox";
 
 export interface GoodsFormState {
   name: string;
   animationName: string;
-  category: string;
   price: string;
   stock: string;
-  description: string;
 }
 
+// 굿즈 사진은 실제 업로드(presigned URL)에 원본 File이 필요해서 base64
+// 미리보기 문자열이 아니라 File 자체를 폼 상태로 들고 있음 — 미리보기는
+// URL.createObjectURL로 그때그때 생성.
 export function GoodsFormFields({
   form,
   setForm,
   errors,
   setErrors,
-  imagePreview,
-  setImagePreview,
+  imageFile,
+  setImageFile,
   imageRef,
   animations,
 }: {
@@ -29,17 +29,21 @@ export function GoodsFormFields({
   setForm: Dispatch<SetStateAction<GoodsFormState>>;
   errors: Record<string, string>;
   setErrors: Dispatch<SetStateAction<Record<string, string>>>;
-  imagePreview: string | null;
-  setImagePreview: (v: string | null) => void;
+  imageFile: File | null;
+  setImageFile: (v: File | null) => void;
   imageRef: RefObject<HTMLInputElement | null>;
   animations: AnimationData[];
 }) {
+  const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => setImagePreview(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    if (file) setImageFile(file);
   };
 
   return (
@@ -59,10 +63,10 @@ export function GoodsFormFields({
             errors.image ? "border-red-500/60" : "border-border hover:border-violet-500/50"
           }`}
         >
-          {imagePreview ? (
+          {previewUrl ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagePreview} alt="미리보기" className="w-full h-full object-cover" />
+              <img src={previewUrl} alt="미리보기" className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                 <span className="text-white text-[11px] font-medium">변경</span>
               </div>
@@ -74,11 +78,11 @@ export function GoodsFormFields({
             </div>
           )}
         </button>
-        {imagePreview && (
+        {previewUrl && (
           <button
             type="button"
             onClick={() => {
-              setImagePreview(null);
+              setImageFile(null);
               if (imageRef.current) imageRef.current.value = "";
             }}
             className="mt-1.5 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-red-400 transition-colors"
@@ -111,20 +115,6 @@ export function GoodsFormFields({
             animations={animations}
           />
           {errors.animationName && <p className="text-[11px] text-red-400 mt-1 font-medium">{errors.animationName}</p>}
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
-            카테고리 <span className="text-red-400">*</span>
-          </label>
-          <CategoryCombobox
-            value={form.category}
-            onChange={(v) => {
-              setForm((f) => ({ ...f, category: v }));
-              setErrors((e) => ({ ...e, category: "" }));
-            }}
-            hasError={!!errors.category}
-          />
-          {errors.category && <p className="text-[11px] text-red-400 mt-1 font-medium">{errors.category}</p>}
         </div>
         <div>
           <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
@@ -161,16 +151,6 @@ export function GoodsFormFields({
             }`}
           />
           {errors.stock && <p className="text-[11px] text-red-400 mt-1 font-medium">{errors.stock}</p>}
-        </div>
-        <div className="sm:col-span-2">
-          <label className="text-xs text-muted-foreground mb-1.5 block font-medium">상세 설명</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            placeholder="굿즈 소재, 사이즈, 특징 등을 입력하세요"
-            rows={2}
-            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 transition-colors resize-none"
-          />
         </div>
       </div>
     </div>

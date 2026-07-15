@@ -1,30 +1,31 @@
-import type { AnimationData, GoodsData } from "@/types/domain";
-import { ANIMATIONS, GOODS, REGIONS } from "./mock-data";
+import { fetchApi } from "@/lib/apiClient";
+import type { AnimationData, GoodsDetail, GoodsSummary } from "@/types/domain";
 
-// mock 기반 데이터 계층. 모든 export 현재는 동기적으로 resolve하지만,
-// async(fetch 형태) 계약 유지하여 각 함수 내부만 실제 Spring Boot API
-// `fetch()` 호출로 교체 시 호출부 변경 불필요.
-
-export async function getAnimations(): Promise<AnimationData[]> {
-  return ANIMATIONS;
-}
-
-export async function getAnimationById(id: number): Promise<AnimationData | null> {
-  return ANIMATIONS.find((a) => a.id === id) ?? null;
+export async function getAnimations(keyword?: string): Promise<AnimationData[]> {
+  const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
+  return fetchApi<AnimationData[]>(`/api/v1/animations${qs}`);
 }
 
 export async function getRegions(): Promise<string[]> {
-  return REGIONS;
+  return fetchApi<string[]>("/api/v1/region");
 }
 
-export async function getGoodsList(): Promise<GoodsData[]> {
-  return GOODS;
+// /goods?q= — 굿즈명 키워드 검색만.
+export async function searchGoodsByKeyword(q: string): Promise<GoodsSummary[]> {
+  return fetchApi<GoodsSummary[]>(`/api/v1/goods?q=${encodeURIComponent(q)}`);
 }
 
-export async function getGoodsById(id: number): Promise<GoodsData | null> {
-  return GOODS.find((g) => g.id === id) ?? null;
+// /goods/search — 작품/지역/키워드 조합 필터. 실사용은 대부분 이쪽(위
+// searchGoodsByKeyword의 상위 호환).
+export async function searchGoods(params: { animationId?: number; region?: string; keyword?: string } = {}): Promise<GoodsSummary[]> {
+  const qs = new URLSearchParams();
+  if (params.animationId) qs.set("animationId", String(params.animationId));
+  if (params.region) qs.set("region", params.region);
+  if (params.keyword) qs.set("keyword", params.keyword);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return fetchApi<GoodsSummary[]>(`/api/v1/goods/search${suffix}`);
 }
 
-export async function getGoodsByStoreId(storeId: number): Promise<GoodsData[]> {
-  return GOODS.filter((g) => g.storeId === storeId);
+export async function getGoodsDetail(goodsId: number): Promise<GoodsDetail> {
+  return fetchApi<GoodsDetail>(`/api/v1/goods/${goodsId}`);
 }

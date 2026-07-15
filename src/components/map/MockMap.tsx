@@ -3,10 +3,17 @@
 import { useState } from "react";
 import type { StoreData } from "@/types/domain";
 
-const MAP_POSITIONS: Record<number, { x: string; y: string }> = {
-  1: { x: "33%", y: "40%" }, 2: { x: "54%", y: "62%" }, 3: { x: "70%", y: "28%" },
-  4: { x: "18%", y: "72%" }, 5: { x: "60%", y: "48%" },
-};
+// 실제 store.id는 예측 불가능한 범위라 예전처럼 id별 좌표를 하드코딩할 수
+// 없음 — 대한민국 대략적 위경도 범위로 lat/lng를 %로 투영. 실제 카카오맵
+// 연동 전까지의 임시 배치용.
+const KOREA_BOUNDS = { latMin: 33.0, latMax: 38.9, lngMin: 125.0, lngMax: 129.6 };
+
+function project(lat: number, lng: number) {
+  const xRatio = (lng - KOREA_BOUNDS.lngMin) / (KOREA_BOUNDS.lngMax - KOREA_BOUNDS.lngMin);
+  const yRatio = (lat - KOREA_BOUNDS.latMin) / (KOREA_BOUNDS.latMax - KOREA_BOUNDS.latMin);
+  const clamp = (v: number) => Math.min(95, Math.max(5, v * 100));
+  return { x: `${clamp(xRatio)}%`, y: `${clamp(1 - yRatio)}%` };
+}
 
 export function MockMap({ stores, onSelect }: { stores: StoreData[]; onSelect: (s: StoreData) => void }) {
   const [hovered, setHovered] = useState<number | null>(null);
@@ -31,8 +38,7 @@ export function MockMap({ stores, onSelect }: { stores: StoreData[]; onSelect: (
         카카오맵 API 연동 예정
       </div>
       {stores.map((store) => {
-        const pos = MAP_POSITIONS[store.id];
-        if (!pos) return null;
+        const pos = project(store.lat, store.lng);
         return (
           <button
             key={store.id}

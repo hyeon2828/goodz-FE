@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Clock, MapPin, Plus, Users } from "lucide-react";
+import { Building2, Clock, MapPin, Plus } from "lucide-react";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { TypeBadge } from "@/features/goods/components/TypeBadge";
 import { useIsSubAdmin, useManagedStores } from "@/features/store/ManagedStoreProvider";
@@ -11,7 +11,7 @@ import type { StoreType } from "@/types/domain";
 
 export default function AdminStoresPage() {
   const router = useRouter();
-  const { loggedIn, userRole, userEmail } = useAuth();
+  const { loggedIn, userRole } = useAuth();
   const isSubAdmin = useIsSubAdmin();
   const { managedStores, addStore } = useManagedStores();
   const isMainAdmin = userRole === "store";
@@ -19,16 +19,20 @@ export default function AdminStoresPage() {
   const [showAddStore, setShowAddStore] = useState(false);
   const [addForm, setAddForm] = useState({ name: "", address: "", type: "permanent" as StoreType, startDate: "", endDate: "", description: "" });
   const [addErrors, setAddErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  const handleAddStore = () => {
+  const handleAddStore = async () => {
     const errs: Record<string, string> = {};
     if (!addForm.name.trim()) errs.name = "업체명을 입력해주세요";
     if (!addForm.address.trim()) errs.address = "주소를 입력해주세요";
     if (addForm.type === "popup" && !addForm.startDate) errs.startDate = "시작일을 입력해주세요";
     if (addForm.type === "popup" && !addForm.endDate) errs.endDate = "종료일을 입력해주세요";
     setAddErrors(errs);
+    setSubmitError("");
     if (Object.keys(errs).length > 0) return;
-    addStore({
+    setSubmitting(true);
+    const result = await addStore({
       name: addForm.name.trim(),
       address: addForm.address.trim(),
       type: addForm.type,
@@ -36,6 +40,11 @@ export default function AdminStoresPage() {
       endDate: addForm.endDate,
       description: addForm.description.trim(),
     });
+    setSubmitting(false);
+    if (!result.success) {
+      setSubmitError(result.message || "업체 등록에 실패했습니다");
+      return;
+    }
     setAddForm({ name: "", address: "", type: "permanent", startDate: "", endDate: "", description: "" });
     setAddErrors({});
     setShowAddStore(false);
@@ -46,7 +55,9 @@ export default function AdminStoresPage() {
     return <DashboardAccessDenied onGoAuth={() => router.push("/signup")} />;
   }
 
-  const visibleStores = isMainAdmin ? managedStores : managedStores.filter((s) => s.subAdmins.includes(userEmail));
+  // GET /stores/admin이 role과 무관하게 "내가 관리하는 업체"만 이미
+  // 서버에서 스코핑해서 내려주므로 클라이언트에서 추가로 거를 게 없음.
+  const visibleStores = managedStores;
 
   return (
     <div className="min-h-screen bg-background pt-14 md:pt-16">
@@ -180,19 +191,25 @@ export default function AdminStoresPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <button onClick={handleAddStore} className="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-colors">
-                  등록하기
+                <button
+                  onClick={handleAddStore}
+                  disabled={submitting}
+                  className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  {submitting ? "등록 중..." : "등록하기"}
                 </button>
                 <button
                   onClick={() => {
                     setShowAddStore(false);
                     setAddErrors({});
+                    setSubmitError("");
                   }}
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 text-muted-foreground text-sm rounded-lg transition-colors"
                 >
                   취소
                 </button>
               </div>
+              {submitError && <p className="text-[11px] text-red-400 mt-2 font-medium">{submitError}</p>}
             </div>
           </div>
         )}
@@ -207,13 +224,15 @@ export default function AdminStoresPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {visibleStores.map((store) => (
               <button
-                key={store.uid}
-                onClick={() => router.push(`/admin/stores/${store.uid}`)}
+                key={store.id}
+                onClick={() => router.push(`/admin/stores/${store.id}`)}
                 className="bg-card border border-border rounded-xl p-5 text-left hover:border-violet-500/30 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-violet-950/20 active:scale-[0.99]"
               >
                 <div className="flex items-start justify-between mb-3">
                   <TypeBadge type={store.type} />
-                  <span className="text-[11px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">{store.goods.length}종 굿즈</span>
+                  {typeof store.goodsCount === "number" && (
+                    <span className="text-[11px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">{store.goodsCount}종 굿즈</span>
+                  )}
                 </div>
                 <h3 className="font-bold text-foreground text-sm mb-1 line-clamp-1" style={{ fontFamily: "Outfit, sans-serif" }}>
                   {store.name}
@@ -228,17 +247,7 @@ export default function AdminStoresPage() {
                     {store.startDate} ~ {store.endDate}
                   </p>
                 )}
-                {store.description && <p className="text-[11px] text-muted-foreground line-clamp-2 mb-3 leading-relaxed">{store.description}</p>}
-                <div className="flex items-center gap-3 pt-2 border-t border-border">
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Users size={11} />
-                    {store.subAdmins.length + 1}명
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Building2 size={11} />
-                    {store.type === "popup" ? "팝업" : "상설"}
-                  </div>
-                </div>
+                {store.description && <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">{store.description}</p>}
               </button>
             ))}
           </div>

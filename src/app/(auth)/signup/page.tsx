@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signupBusiness, signupMember } from "@/features/auth/api";
 import { AuthShell } from "@/features/auth/components/AuthShell";
 import { RoleSelector } from "@/features/auth/components/RoleSelector";
 import { isValidEmail } from "@/lib/helpers";
@@ -15,16 +16,28 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [errors, setErrors] = useState<{ name?: string; email?: string; pw?: string }>({});
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs: { name?: string; email?: string; pw?: string } = {};
     if (!name.trim()) errs.name = "이름을 입력해주세요";
     if (!isValidEmail(email)) errs.email = "올바른 이메일 형식을 입력해주세요";
     if (pw.length < 8) errs.pw = "비밀번호는 8자 이상이어야 합니다";
     setErrors(errs);
-    if (Object.keys(errs).length === 0) {
-      router.push(`/verify-email?email=${encodeURIComponent(email)}&role=${role}`);
+    setFormError("");
+    if (Object.keys(errs).length > 0) return;
+
+    setSubmitting(true);
+    const input = { name: name.trim(), email, password: pw };
+    const result = role === "user" ? await signupMember(input) : await signupBusiness(input);
+    setSubmitting(false);
+
+    if (!result.success) {
+      setFormError(result.message || "회원가입에 실패했습니다");
+      return;
     }
+    router.push(`/verify-email?email=${encodeURIComponent(email)}`);
   };
 
   return (
@@ -46,6 +59,7 @@ export default function SignupPage() {
             onChange={(e) => {
               setName(e.target.value);
               setErrors((v) => ({ ...v, name: undefined }));
+              setFormError("");
             }}
             placeholder="홍길동"
             className={`w-full bg-card border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors ${
@@ -62,6 +76,7 @@ export default function SignupPage() {
             onChange={(e) => {
               setEmail(e.target.value);
               setErrors((v) => ({ ...v, email: undefined }));
+              setFormError("");
             }}
             placeholder="hello@example.com"
             className={`w-full bg-card border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors ${
@@ -78,6 +93,7 @@ export default function SignupPage() {
             onChange={(e) => {
               setPw(e.target.value);
               setErrors((v) => ({ ...v, pw: undefined }));
+              setFormError("");
             }}
             placeholder="••••••••"
             className={`w-full bg-card border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors ${
@@ -90,11 +106,14 @@ export default function SignupPage() {
           </p>
         </div>
 
+        {formError && <p className="text-xs text-red-400 font-medium text-center">{formError}</p>}
+
         <button
           onClick={handleSubmit}
-          className="w-full py-3 mt-1 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors shadow-xl shadow-violet-900/40 text-sm active:scale-[0.99]"
+          disabled={submitting}
+          className="w-full py-3 mt-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold rounded-xl transition-colors shadow-xl shadow-violet-900/40 text-sm active:scale-[0.99]"
         >
-          가입하기
+          {submitting ? "가입 처리 중..." : "가입하기"}
         </button>
       </div>
     </AuthShell>

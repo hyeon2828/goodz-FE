@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Filter, LayoutList, Map as MapIcon, Search } from "lucide-react";
 import { LoginPromptModal } from "@/components/common/LoginPromptModal";
@@ -9,69 +9,92 @@ import { useAuth } from "@/features/auth/AuthProvider";
 import { GoodsCard } from "@/features/goods/components/GoodsCard";
 import { GoodsDetailModal } from "@/features/goods/components/GoodsDetailModal";
 import { StoreCard } from "@/features/goods/components/StoreCard";
+import { searchGoods } from "@/features/goods/api";
 import { AddToPlanModal } from "@/features/planner/components/AddToPlanModal";
-import type { AnimationData, GoodsData, StoreData } from "@/types/domain";
+import { getStores } from "@/features/store/api";
+import type { AnimationData, GoodsSummary, PendingPlanItem, StoreData } from "@/types/domain";
 
 type ViewMode = "list" | "map";
 
 export function ExploreClient({
-  goods,
-  stores,
+  goods: initialGoods,
+  goodsError: initialGoodsError,
+  stores: initialStores,
+  storesError: initialStoresError,
   animations,
   regions,
 }: {
-  goods: GoodsData[];
+  goods: GoodsSummary[];
+  goodsError?: string | null;
   stores: StoreData[];
+  storesError?: string | null;
   animations: AnimationData[];
   regions: string[];
 }) {
   const router = useRouter();
   const { loggedIn } = useAuth();
 
-  const animById = useMemo(() => new Map(animations.map((a) => [a.id, a])), [animations]);
-  const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
-
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedAnim, setSelectedAnim] = useState<number | null>(null);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [tab, setTab] = useState<"goods" | "stores">("goods");
   const [showFilters, setShowFilters] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [detailGoods, setDetailGoods] = useState<GoodsData | null>(null);
-  const [pendingGoods, setPendingGoods] = useState<GoodsData | null>(null);
+  const [detailGoodsId, setDetailGoodsId] = useState<number | null>(null);
+  const [pendingItem, setPendingItem] = useState<PendingPlanItem | null>(null);
+
+  const [goods, setGoods] = useState(initialGoods);
+  const [goodsError, setGoodsError] = useState(initialGoodsError ?? null);
+  const [stores, setStores] = useState(initialStores);
+  const [storesError, setStoresError] = useState(initialStoresError ?? null);
+
+  // 검색어는 300ms 디바운스 — 타이핑마다 서버에 쿼리 안 날림.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // 작품/지역 필터, 검색어는 API가 서버에서 걸러줌 — 목록엔 그걸 필터링할
+  // region/storeId 같은 필드 자체가 없어서(GoodsSummary/StoreData 실제
+  // 스키마 참고) 클라이언트 필터링이 불가능해짐.
+  // goods/stores 조회를 따로 처리 — 하나가 실패해도 다른 하나는 정상
+  // 반영되도록(둘을 Promise.all로 묶으면 하나만 실패해도 둘 다 못 씀).
+  useEffect(() => {
+    let cancelled = false;
+    const params = {
+      animationId: selectedAnim ?? undefined,
+      region: selectedRegion ?? undefined,
+      keyword: debouncedQuery || undefined,
+    };
+
+    searchGoods(params)
+      .then((g) => {
+        if (cancelled) return;
+        setGoods(g);
+        setGoodsError(null);
+      })
+      .catch((e) => {
+        if (!cancelled) setGoodsError(e instanceof Error ? e.message : "굿즈를 불러오지 못했습니다");
+      });
+
+    getStores(params)
+      .then((s) => {
+        if (cancelled) return;
+        setStores(s);
+        setStoresError(null);
+      })
+      .catch((e) => {
+        if (!cancelled) setStoresError(e instanceof Error ? e.message : "업체 정보를 불러오지 못했습니다");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAnim, selectedRegion, debouncedQuery]);
 
   const goToStore = (s: StoreData) => router.push(`/stores/${s.id}`);
-
-  const filteredGoods = useMemo(
-    () =>
-      goods.filter((g) => {
-        if (selectedAnim && g.animationId !== selectedAnim) return false;
-        if (selectedRegion && storeById.get(g.storeId)?.region !== selectedRegion) return false;
-        if (query) {
-          const a = animById.get(g.animationId);
-          return g.name.includes(query) || (a?.title.includes(query) ?? false);
-        }
-        return true;
-      }),
-    [goods, storeById, animById, selectedAnim, selectedRegion, query]
-  );
-
-  const filteredStores = useMemo(
-    () =>
-      stores.filter((s) => {
-        if (selectedRegion && s.region !== selectedRegion) return false;
-        if (selectedAnim && !goods.some((g) => g.storeId === s.id && g.animationId === selectedAnim)) return false;
-        if (query) return s.name.includes(query) || s.address.includes(query);
-        return true;
-      }),
-    [stores, goods, selectedAnim, selectedRegion, query]
-  );
-
-  const storeAnimations = (storeId: number) => {
-    const ids = [...new Set(goods.filter((g) => g.storeId === storeId).map((g) => g.animationId))];
-    return ids.map((id) => animById.get(id)).filter((a): a is AnimationData => !!a);
-  };
 
   const activeFilters = (selectedAnim ? 1 : 0) + (selectedRegion ? 1 : 0);
 
@@ -126,7 +149,7 @@ export function ExploreClient({
                   selectedAnim === a.id ? "bg-violet-600 text-white shadow-md shadow-violet-900/30" : "bg-card border border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {a.emoji} {a.title}
+                {a.title}
               </button>
             ))}
           </div>
@@ -171,7 +194,7 @@ export function ExploreClient({
                     onClick={() => setSelectedAnim(selectedAnim === a.id ? null : a.id)}
                     className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${selectedAnim === a.id ? "bg-violet-600 text-white" : "bg-muted border border-border text-muted-foreground"}`}
                   >
-                    {a.emoji} {a.title}
+                    {a.title}
                   </button>
                 ))}
               </div>
@@ -203,8 +226,8 @@ export function ExploreClient({
           {viewMode === "list" ? (
             <div className="flex items-center gap-1 bg-card border border-border rounded-xl p-1">
               {([
-                ["goods", `굿즈 ${filteredGoods.length}`],
-                ["stores", `업체 ${filteredStores.length}`],
+                ["goods", `굿즈 ${goods.length}`],
+                ["stores", `업체 ${stores.length}`],
               ] as const).map(([t, label]) => (
                 <button
                   key={t}
@@ -216,7 +239,7 @@ export function ExploreClient({
               ))}
             </div>
           ) : (
-            <p className="text-xs md:text-sm text-muted-foreground">업체 {filteredStores.length}곳</p>
+            <p className="text-xs md:text-sm text-muted-foreground">업체 {stores.length}곳</p>
           )}
           <div className="flex items-center gap-1 bg-card border border-border rounded-xl p-1">
             <button
@@ -244,52 +267,62 @@ export function ExploreClient({
             message={"플래너에 굿즈를 담으려면\n로그인 또는 회원가입이 필요합니다"}
           />
         )}
-        {detailGoods && (
-          <GoodsDetailModal
-            goods={detailGoods}
-            anim={animById.get(detailGoods.animationId)!}
-            store={storeById.get(detailGoods.storeId)!}
-            onAdd={(g) => setPendingGoods(g)}
-            onClose={() => setDetailGoods(null)}
-          />
+        {detailGoodsId !== null && (
+          <GoodsDetailModal goodsId={detailGoodsId} onAdd={(item) => setPendingItem(item)} onClose={() => setDetailGoodsId(null)} />
         )}
-        {pendingGoods && (
-          <AddToPlanModal goods={pendingGoods} anim={animById.get(pendingGoods.animationId)!} onClose={() => setPendingGoods(null)} />
-        )}
+        {pendingItem && <AddToPlanModal item={pendingItem} onClose={() => setPendingItem(null)} />}
 
         {viewMode === "list" ? (
           tab === "goods" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-              {filteredGoods.map((g) => (
-                <GoodsCard
-                  key={g.id}
-                  goods={g}
-                  anim={animById.get(g.animationId)!}
-                  store={storeById.get(g.storeId)!}
-                  onAdd={(goods) => setPendingGoods(goods)}
-                  isLoggedIn={loggedIn}
-                  onLoginPrompt={() => setShowLoginPrompt(true)}
-                  onShowDetail={loggedIn ? (goods) => setDetailGoods(goods) : undefined}
-                />
-              ))}
-              {filteredGoods.length === 0 && <div className="col-span-4 text-center py-16 text-muted-foreground text-sm">검색 결과가 없습니다</div>}
+            goodsError ? (
+              <div className="text-center py-16">
+                <p className="text-sm text-red-400 font-medium mb-1">굿즈 목록을 불러오지 못했습니다</p>
+                <p className="text-xs text-muted-foreground">{goodsError}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                {goods.map((g) => (
+                  <GoodsCard
+                    key={g.id}
+                    goods={g}
+                    onClick={() => {
+                      if (!loggedIn) {
+                        setShowLoginPrompt(true);
+                        return;
+                      }
+                      setDetailGoodsId(g.id);
+                    }}
+                  />
+                ))}
+                {goods.length === 0 && <div className="col-span-4 text-center py-16 text-muted-foreground text-sm">검색 결과가 없습니다</div>}
+              </div>
+            )
+          ) : storesError ? (
+            <div className="text-center py-16">
+              <p className="text-sm text-red-400 font-medium mb-1">업체 목록을 불러오지 못했습니다</p>
+              <p className="text-xs text-muted-foreground">{storesError}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-              {filteredStores.map((s) => (
-                <StoreCard key={s.id} store={s} animations={storeAnimations(s.id)} onClick={() => goToStore(s)} />
+              {stores.map((s) => (
+                <StoreCard key={s.id} store={s} onClick={() => goToStore(s)} />
               ))}
-              {filteredStores.length === 0 && <div className="col-span-3 text-center py-16 text-muted-foreground text-sm">검색 결과가 없습니다</div>}
+              {stores.length === 0 && <div className="col-span-3 text-center py-16 text-muted-foreground text-sm">검색 결과가 없습니다</div>}
             </div>
           )
+        ) : storesError ? (
+          <div className="text-center py-16">
+            <p className="text-sm text-red-400 font-medium mb-1">업체 목록을 불러오지 못했습니다</p>
+            <p className="text-xs text-muted-foreground">{storesError}</p>
+          </div>
         ) : (
           <div className="flex flex-col md:flex-row gap-3 md:gap-4">
             <div className="w-full md:flex-1 h-72 md:h-[560px] rounded-xl overflow-hidden">
-              <MockMap stores={filteredStores} onSelect={goToStore} />
+              <MockMap stores={stores} onSelect={goToStore} />
             </div>
             <div className="w-full md:w-72 max-h-72 md:max-h-[560px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 pb-2">
-              {filteredStores.map((s) => (
-                <StoreCard key={s.id} store={s} animations={storeAnimations(s.id)} onClick={() => goToStore(s)} />
+              {stores.map((s) => (
+                <StoreCard key={s.id} store={s} onClick={() => goToStore(s)} />
               ))}
             </div>
           </div>

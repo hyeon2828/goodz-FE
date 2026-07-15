@@ -2,44 +2,54 @@
 
 import { useState } from "react";
 import { format } from "date-fns";
+import { Sparkles } from "lucide-react";
+import { gradientForId } from "@/lib/gradient";
 import { usePlanner } from "../PlannerProvider";
-import type { AnimationData, GoodsData } from "@/types/domain";
+import type { PendingPlanItem } from "@/types/domain";
 
-export function AddToPlanModal({
-  goods,
-  anim,
-  onClose,
-}: {
-  goods: GoodsData;
-  anim: AnimationData;
-  onClose: () => void;
-}) {
-  const { plans, entries, createPlanWithEntry, addEntryToPlan } = usePlanner();
+export function AddToPlanModal({ item, onClose }: { item: PendingPlanItem; onClose: () => void }) {
+  const { plans, createPlanWithEntry, addEntryToPlan } = usePlanner();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [mode, setMode] = useState<"new" | "existing">("new");
   const [title, setTitle] = useState("");
-  const [selectedPlanUid, setSelectedPlanUid] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const plansForDate = plans.filter((p) => p.date === date);
 
   const handleDateChange = (d: string) => {
     setDate(d);
+    setError("");
     const existing = plans.filter((p) => p.date === d);
     if (existing.length > 0) {
       setMode("existing");
-      setSelectedPlanUid(existing[0].uid);
+      setSelectedPlanId(existing[0].id);
     } else {
       setMode("new");
-      setSelectedPlanUid(null);
+      setSelectedPlanId(null);
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    setError("");
     if (mode === "new") {
       if (!title.trim()) return;
-      createPlanWithEntry(title.trim(), date, goods.id, goods.storeId);
+      setSubmitting(true);
+      const result = await createPlanWithEntry(title.trim(), date, item);
+      setSubmitting(false);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
     } else {
-      if (!selectedPlanUid) return;
-      addEntryToPlan(selectedPlanUid, goods.id, goods.storeId);
+      if (!selectedPlanId) return;
+      setSubmitting(true);
+      const result = await addEntryToPlan(selectedPlanId, date, item);
+      setSubmitting(false);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
     }
     onClose();
   };
@@ -49,14 +59,16 @@ export function AddToPlanModal({
       <div className="bg-card border border-border rounded-t-3xl sm:rounded-2xl p-6 w-full sm:max-w-sm shadow-2xl">
         <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-5 sm:hidden" />
         <div className="flex items-center gap-3 mb-5">
-          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${goods.gradient} flex items-center justify-center text-xl shrink-0`}>
-            {anim.emoji}
+          <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradientForId(item.storeGoodsId)} flex items-center justify-center shrink-0`}>
+            <Sparkles size={20} className="text-white/80" />
           </div>
           <div>
             <h3 className="font-bold text-foreground text-sm" style={{ fontFamily: "Outfit, sans-serif" }}>
               플래너에 담기
             </h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{goods.name}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {item.goodsName} · {item.storeName}
+            </p>
           </div>
         </div>
         <div className="mb-4">
@@ -79,7 +91,7 @@ export function AddToPlanModal({
             <button
               onClick={() => {
                 setMode("existing");
-                setSelectedPlanUid(plansForDate[0].uid);
+                setSelectedPlanId(plansForDate[0].id);
               }}
               className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === "existing" ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}
             >
@@ -104,31 +116,32 @@ export function AddToPlanModal({
             <label className="text-xs text-muted-foreground mb-1.5 block font-medium">플랜 선택</label>
             {plansForDate.map((p) => (
               <button
-                key={p.uid}
-                onClick={() => setSelectedPlanUid(p.uid)}
+                key={p.id}
+                onClick={() => setSelectedPlanId(p.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                  selectedPlanUid === p.uid ? "border-violet-500/50 bg-violet-500/10" : "border-border bg-background hover:border-white/15"
+                  selectedPlanId === p.id ? "border-violet-500/50 bg-violet-500/10" : "border-border bg-background hover:border-white/15"
                 }`}
               >
-                <div className={`w-2 h-2 rounded-full shrink-0 ${selectedPlanUid === p.uid ? "bg-violet-400" : "bg-muted-foreground/30"}`} />
+                <div className={`w-2 h-2 rounded-full shrink-0 ${selectedPlanId === p.id ? "bg-violet-400" : "bg-muted-foreground/30"}`} />
                 <div className="min-w-0">
-                  <p className={`text-xs font-semibold truncate ${selectedPlanUid === p.uid ? "text-violet-300" : "text-foreground"}`}>{p.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{entries.filter((e) => e.planUid === p.uid).length}개 담김</p>
+                  <p className={`text-xs font-semibold truncate ${selectedPlanId === p.id ? "text-violet-300" : "text-foreground"}`}>{p.title}</p>
+                  <p className="text-[10px] text-muted-foreground">{p.goodsCount}개 담김</p>
                 </div>
               </button>
             ))}
           </div>
         )}
+        {error && <p className="text-xs text-red-400 mb-3 leading-relaxed">{error}</p>}
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-muted-foreground text-sm rounded-xl transition-colors font-medium">
             취소
           </button>
           <button
             onClick={handleConfirm}
-            disabled={mode === "new" ? !title.trim() : !selectedPlanUid}
+            disabled={submitting || (mode === "new" ? !title.trim() : !selectedPlanId)}
             className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-colors shadow-lg shadow-violet-900/30"
           >
-            담기
+            {submitting ? "담는 중..." : "담기"}
           </button>
         </div>
       </div>

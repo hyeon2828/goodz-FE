@@ -1,33 +1,43 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Clock, MapPin, Star } from "lucide-react";
+import { ArrowLeft, Clock, MapPin } from "lucide-react";
 import { LoginPromptModal } from "@/components/common/LoginPromptModal";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { GoodsCard } from "@/features/goods/components/GoodsCard";
-import { GoodsDetailModal } from "@/features/goods/components/GoodsDetailModal";
+import { StoreGoodsCard } from "@/features/goods/components/StoreGoodsCard";
 import { TypeBadge } from "@/features/goods/components/TypeBadge";
 import { AddToPlanModal } from "@/features/planner/components/AddToPlanModal";
-import type { AnimationData, GoodsData, StoreData } from "@/types/domain";
+import type { PendingPlanItem, StoreData, StoreGoodsItem } from "@/types/domain";
 
 export function StoreDetailClient({
   store,
   storeGoods,
-  animations,
+  storeGoodsError,
 }: {
   store: StoreData;
-  storeGoods: GoodsData[];
-  animations: AnimationData[];
+  storeGoods: StoreGoodsItem[];
+  storeGoodsError?: string | null;
 }) {
   const router = useRouter();
   const { loggedIn } = useAuth();
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [detailGoods, setDetailGoods] = useState<GoodsData | null>(null);
-  const [pendingGoods, setPendingGoods] = useState<GoodsData | null>(null);
+  const [pendingItem, setPendingItem] = useState<PendingPlanItem | null>(null);
 
-  const animById = useMemo(() => new Map(animations.map((a) => [a.id, a])), [animations]);
-  const animIds = [...new Set(storeGoods.map((g) => g.animationId))];
+  // StoreGoodsItem에 animationTitle이 이미 포함돼 있어 별도 조회 없이 바로
+  // 이 업체가 취급하는 작품 목록을 뽑을 수 있음.
+  const animationTitles = [...new Set(storeGoods.map((g) => g.animationTitle))];
+
+  const handleAdd = (item: StoreGoodsItem) => {
+    setPendingItem({
+      storeGoodsId: item.storeGoodsId,
+      goodsName: item.goodsName,
+      animationTitle: item.animationTitle,
+      storeId: store.id,
+      storeName: store.name,
+      price: item.price,
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background pt-14 md:pt-16">
@@ -55,24 +65,15 @@ export function StoreDetailClient({
                   {store.startDate} ~ {store.endDate}
                 </p>
               )}
-              <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                <div className="flex items-center gap-1">
-                  <Star size={12} className="text-amber-400 fill-amber-400" />
-                  <span className="font-bold text-foreground text-sm">{store.rating}</span>
-                  <span className="text-muted-foreground text-xs">({store.reviewCount.toLocaleString()}명)</span>
+              {animationTitles.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2.5">
+                  {animationTitles.map((t) => (
+                    <span key={t} className="text-[10px] bg-white/5 border border-border px-1.5 py-0.5 rounded-full text-muted-foreground">
+                      {t}
+                    </span>
+                  ))}
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {animIds.map((id) => {
-                    const a = animById.get(id);
-                    if (!a) return null;
-                    return (
-                      <span key={id} className="text-[10px] bg-white/5 border border-border px-1.5 py-0.5 rounded-full text-muted-foreground">
-                        {a.emoji} {a.title}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
               <p className="text-xs md:text-sm text-muted-foreground mt-2.5 leading-relaxed">{store.description}</p>
             </div>
             <div className="relative w-44 h-28 rounded-xl overflow-hidden bg-[#0D1B2E] shrink-0 hidden md:block">
@@ -98,41 +99,26 @@ export function StoreDetailClient({
         <h2 className="font-bold text-foreground mb-4 text-sm md:text-base" style={{ fontFamily: "Outfit, sans-serif" }}>
           판매 굿즈 <span className="text-muted-foreground font-normal text-sm">{storeGoods.length}종</span>
         </h2>
-        {storeGoods.length > 0 ? (
+        {showLoginPrompt && (
+          <LoginPromptModal
+            onLogin={() => {
+              setShowLoginPrompt(false);
+              router.push("/login");
+            }}
+            onClose={() => setShowLoginPrompt(false)}
+            message={"플래너에 굿즈를 담으려면\n로그인 또는 회원가입이 필요합니다"}
+          />
+        )}
+        {pendingItem && <AddToPlanModal item={pendingItem} onClose={() => setPendingItem(null)} />}
+        {storeGoodsError ? (
+          <div className="text-center py-16">
+            <p className="text-sm text-red-400 font-medium mb-1">굿즈 목록을 불러오지 못했습니다</p>
+            <p className="text-xs text-muted-foreground">{storeGoodsError}</p>
+          </div>
+        ) : storeGoods.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-            {showLoginPrompt && (
-              <LoginPromptModal
-                onLogin={() => {
-                  setShowLoginPrompt(false);
-                  router.push("/login");
-                }}
-                onClose={() => setShowLoginPrompt(false)}
-                message={"플래너에 굿즈를 담으려면\n로그인 또는 회원가입이 필요합니다"}
-              />
-            )}
-            {detailGoods && (
-              <GoodsDetailModal
-                goods={detailGoods}
-                anim={animById.get(detailGoods.animationId)!}
-                store={store}
-                onAdd={(g) => setPendingGoods(g)}
-                onClose={() => setDetailGoods(null)}
-              />
-            )}
-            {pendingGoods && (
-              <AddToPlanModal goods={pendingGoods} anim={animById.get(pendingGoods.animationId)!} onClose={() => setPendingGoods(null)} />
-            )}
             {storeGoods.map((g) => (
-              <GoodsCard
-                key={g.id}
-                goods={g}
-                anim={animById.get(g.animationId)!}
-                store={store}
-                onAdd={(goods) => setPendingGoods(goods)}
-                isLoggedIn={loggedIn}
-                onLoginPrompt={() => setShowLoginPrompt(true)}
-                onShowDetail={loggedIn ? (goods) => setDetailGoods(goods) : undefined}
-              />
+              <StoreGoodsCard key={g.storeGoodsId} item={g} onAdd={handleAdd} isLoggedIn={loggedIn} onLoginPrompt={() => setShowLoginPrompt(true)} />
             ))}
           </div>
         ) : (

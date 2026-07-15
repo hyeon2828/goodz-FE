@@ -1,18 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format,
   isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths,
 } from "date-fns";
-import { Bookmark, ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { Bookmark, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { LoginPromptModal } from "@/components/common/LoginPromptModal";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { TypeBadge } from "@/features/goods/components/TypeBadge";
+import { gradientForId } from "@/lib/gradient";
 import { usePlanner } from "@/features/planner/PlannerProvider";
+import { getPlannerDetail } from "@/features/planner/api";
 import { fmtPrice } from "@/lib/helpers";
-import type { AnimationData, GoodsData, Plan, PlanEntry, StoreData } from "@/types/domain";
+import type { PlanEntry } from "@/types/domain";
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -24,7 +25,8 @@ function PlannerCalendar({
   setSelectedDate,
   setShowCal,
   setShowCreatePlan,
-  plans,
+  totalPlans,
+  visitDays,
   datesWithPlans,
 }: {
   currentMonth: Date;
@@ -34,7 +36,8 @@ function PlannerCalendar({
   setSelectedDate: (d: Date) => void;
   setShowCal: (v: boolean) => void;
   setShowCreatePlan: (v: boolean) => void;
-  plans: Plan[];
+  totalPlans: number;
+  visitDays: number;
   datesWithPlans: Set<string>;
 }) {
   return (
@@ -83,7 +86,7 @@ function PlannerCalendar({
         })}
       </div>
       <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-3">
-        {[["전체 플랜", `${plans.length}개`], ["방문 예정", `${datesWithPlans.size}일`]].map(([label, val]) => (
+        {[["전체 플랜", `${totalPlans}개`], ["방문 예정", `${visitDays}일`]].map(([label, val]) => (
           <div key={label}>
             <p className="text-[11px] text-muted-foreground">{label}</p>
             <p className="font-bold text-foreground text-sm mt-0.5" style={{ fontFamily: "Outfit, sans-serif" }}>
@@ -96,22 +99,10 @@ function PlannerCalendar({
   );
 }
 
-export function PlannerClient({
-  goods,
-  stores,
-  animations,
-}: {
-  goods: GoodsData[];
-  stores: StoreData[];
-  animations: AnimationData[];
-}) {
+export function PlannerClient() {
   const router = useRouter();
   const { loggedIn } = useAuth();
-  const { plans, entries, removePlan, removeEntry, createEmptyPlan } = usePlanner();
-
-  const goodsById = useMemo(() => new Map(goods.map((g) => [g.id, g])), [goods]);
-  const storeById = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores]);
-  const animById = useMemo(() => new Map(animations.map((a) => [a.id, a])), [animations]);
+  const { plans, totalPlans, visitDays, removePlan, removeEntry, createEmptyPlan } = usePlanner();
 
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today);
@@ -119,7 +110,39 @@ export function PlannerClient({
   const [showCal, setShowCal] = useState(false);
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState("");
-  const [deletePlanUid, setDeletePlanUid] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [deletePlanId, setDeletePlanId] = useState<number | null>(null);
+
+  const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+  const dayPlans = plans.filter((p) => p.date === selectedDateStr);
+
+  // plan 상세(담긴 굿즈 목록)는 목록 응답에 없어서 화면에 보이는 날짜의
+  // 플랜만 따로 조회함. plans가 갱신될 때마다(추가/삭제 등) 다시 불러와서
+  // 최신 상태를 반영.
+  const [planGoods, setPlanGoods] = useState<Record<number, PlanEntry[]>>({});
+  const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
+  const [detailError, setDetailError] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    dayPlans.forEach((plan) => {
+      setDetailLoading((prev) => ({ ...prev, [plan.id]: true }));
+      getPlannerDetail(plan.id).then((result) => {
+        if (result.success && result.data) {
+          setPlanGoods((prev) => ({ ...prev, [plan.id]: result.data!.goods }));
+          setDetailError((prev) => {
+            const next = { ...prev };
+            delete next[plan.id];
+            return next;
+          });
+        } else {
+          setDetailError((prev) => ({ ...prev, [plan.id]: result.message || "굿즈 목록을 불러오지 못했습니다" }));
+        }
+        setDetailLoading((prev) => ({ ...prev, [plan.id]: false }));
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDateStr, plans]);
 
   if (!loggedIn) {
     return (
@@ -136,13 +159,18 @@ export function PlannerClient({
   const calStart = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
   const calEnd = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 });
   const calDays = eachDayOfInterval({ start: calStart, end: calEnd });
-  const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
-  const dayPlans = plans.filter((p) => p.date === selectedDateStr);
   const datesWithPlans = new Set(plans.map((p) => p.date));
 
-  const handleCreatePlan = () => {
+  const handleCreatePlan = async () => {
     if (!newPlanTitle.trim()) return;
-    createEmptyPlan(newPlanTitle.trim(), selectedDateStr);
+    setCreating(true);
+    setCreateError("");
+    const result = await createEmptyPlan(newPlanTitle.trim(), selectedDateStr);
+    setCreating(false);
+    if (!result.success) {
+      setCreateError(result.message);
+      return;
+    }
     setNewPlanTitle("");
     setShowCreatePlan(false);
   };
@@ -173,7 +201,8 @@ export function PlannerClient({
               setSelectedDate={setSelectedDate}
               setShowCal={setShowCal}
               setShowCreatePlan={setShowCreatePlan}
-              plans={plans}
+              totalPlans={totalPlans}
+              visitDays={visitDays}
               datesWithPlans={datesWithPlans}
             />
           </div>
@@ -189,7 +218,8 @@ export function PlannerClient({
               setSelectedDate={setSelectedDate}
               setShowCal={setShowCal}
               setShowCreatePlan={setShowCreatePlan}
-              plans={plans}
+              totalPlans={totalPlans}
+              visitDays={visitDays}
               datesWithPlans={datesWithPlans}
             />
           </div>
@@ -202,6 +232,7 @@ export function PlannerClient({
                 onClick={() => {
                   setShowCreatePlan((s) => !s);
                   setNewPlanTitle("");
+                  setCreateError("");
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-violet-900/30"
               >
@@ -220,13 +251,18 @@ export function PlannerClient({
                     autoFocus
                     className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 transition-colors"
                   />
-                  <button onClick={handleCreatePlan} className="px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold rounded-lg transition-colors">
-                    만들기
+                  <button
+                    onClick={handleCreatePlan}
+                    disabled={creating || !newPlanTitle.trim()}
+                    className="px-3 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-colors"
+                  >
+                    {creating ? "만드는 중..." : "만들기"}
                   </button>
                   <button onClick={() => setShowCreatePlan(false)} className="px-3 py-2 bg-white/5 hover:bg-white/10 text-muted-foreground text-xs rounded-lg transition-colors">
                     취소
                   </button>
                 </div>
+                {createError && <p className="text-xs text-red-400 mt-2">{createError}</p>}
               </div>
             )}
             {dayPlans.length === 0 ? (
@@ -245,22 +281,24 @@ export function PlannerClient({
             ) : (
               <div className="space-y-4">
                 {dayPlans.map((plan) => {
-                  const planEntries = entries.filter((e) => e.planUid === plan.uid);
-                  const planTotal = planEntries.reduce((sum, e) => sum + (goodsById.get(e.goodsId)?.price ?? 0), 0);
+                  const planEntries = planGoods[plan.id] ?? [];
+                  const isLoadingDetail = detailLoading[plan.id];
+                  const loadError = detailError[plan.id];
+                  const planTotal = planEntries.reduce((sum, e) => sum + e.price, 0);
                   const byStore = planEntries.reduce<Record<number, PlanEntry[]>>((acc, e) => {
                     if (!acc[e.storeId]) acc[e.storeId] = [];
                     acc[e.storeId].push(e);
                     return acc;
                   }, {});
                   return (
-                    <div key={plan.uid} className="bg-card border border-border rounded-2xl overflow-hidden">
+                    <div key={plan.id} className="bg-card border border-border rounded-2xl overflow-hidden">
                       <div className="px-4 md:px-5 py-3.5 border-b border-border flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
                           <span className="font-bold text-foreground text-sm md:text-base truncate" style={{ fontFamily: "Outfit, sans-serif" }}>
                             {plan.title}
                           </span>
-                          <span className="text-[11px] text-muted-foreground shrink-0">{planEntries.length}개 굿즈</span>
+                          <span className="text-[11px] text-muted-foreground shrink-0">{plan.goodsCount}개 굿즈</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {planEntries.length > 0 && (
@@ -268,12 +306,20 @@ export function PlannerClient({
                               {fmtPrice(planTotal)}
                             </span>
                           )}
-                          <button onClick={() => setDeletePlanUid(plan.uid)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
+                          <button onClick={() => setDeletePlanId(plan.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
                             <Trash2 size={13} />
                           </button>
                         </div>
                       </div>
-                      {planEntries.length === 0 ? (
+                      {isLoadingDetail ? (
+                        <div className="px-5 py-5 text-center">
+                          <p className="text-xs text-muted-foreground">불러오는 중...</p>
+                        </div>
+                      ) : loadError ? (
+                        <div className="px-5 py-5 text-center">
+                          <p className="text-xs text-red-400">{loadError}</p>
+                        </div>
+                      ) : planEntries.length === 0 ? (
                         <div className="px-5 py-5 text-center">
                           <p className="text-xs text-muted-foreground">아직 담은 굿즈가 없어요</p>
                           <button onClick={() => router.push("/goods")} className="mt-2 text-xs text-violet-400 hover:text-violet-300 transition-colors font-medium">
@@ -282,50 +328,40 @@ export function PlannerClient({
                         </div>
                       ) : (
                         Object.entries(byStore).map(([storeIdStr, storeEntries]) => {
-                          const s = storeById.get(Number(storeIdStr));
-                          if (!s) return null;
-                          const storeTotal = storeEntries.reduce((sum, e) => sum + (goodsById.get(e.goodsId)?.price ?? 0), 0);
+                          const storeTotal = storeEntries.reduce((sum, e) => sum + e.price, 0);
                           return (
                             <div key={storeIdStr} className="border-t border-border">
                               <div className="px-4 md:px-5 py-2.5 flex items-center justify-between bg-white/[0.02]">
-                                <div className="flex items-center gap-2">
-                                  <TypeBadge type={s.type} />
-                                  <span className="text-xs font-semibold text-foreground">{s.name}</span>
-                                </div>
+                                <span className="text-xs font-semibold text-foreground">{storeEntries[0].storeName}</span>
                                 <span className="text-xs font-bold text-foreground" style={{ fontFamily: "Outfit, sans-serif" }}>
                                   {fmtPrice(storeTotal)}
                                 </span>
                               </div>
                               <div className="divide-y divide-border">
-                                {storeEntries.map((e) => {
-                                  const g = goodsById.get(e.goodsId);
-                                  if (!g) return null;
-                                  const a = animById.get(g.animationId);
-                                  return (
-                                    <div key={e.uid} className="px-4 md:px-5 py-3 flex items-center justify-between group">
-                                      <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${g.gradient} flex items-center justify-center text-sm shrink-0`}>{a?.emoji}</div>
-                                        <div className="min-w-0">
-                                          <p className="text-xs md:text-sm font-semibold text-foreground truncate">{g.name}</p>
-                                          <p className="text-[10px] md:text-[11px] text-muted-foreground">
-                                            {a?.title} · {g.category}
-                                          </p>
-                                        </div>
+                                {storeEntries.map((e) => (
+                                  <div key={e.id} className="px-4 md:px-5 py-3 flex items-center justify-between group">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradientForId(e.storeGoodsId)} flex items-center justify-center shrink-0`}>
+                                        <Sparkles size={14} className="text-white/80" />
                                       </div>
-                                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                                        <span className="text-xs md:text-sm font-bold text-foreground" style={{ fontFamily: "Outfit, sans-serif" }}>
-                                          {fmtPrice(g.price)}
-                                        </span>
-                                        <button
-                                          onClick={() => removeEntry(e.uid)}
-                                          className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                          <X size={13} />
-                                        </button>
+                                      <div className="min-w-0">
+                                        <p className="text-xs md:text-sm font-semibold text-foreground truncate">{e.goodsName}</p>
+                                        <p className="text-[10px] md:text-[11px] text-muted-foreground">{e.animationTitle}</p>
                                       </div>
                                     </div>
-                                  );
-                                })}
+                                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                                      <span className="text-xs md:text-sm font-bold text-foreground" style={{ fontFamily: "Outfit, sans-serif" }}>
+                                        {fmtPrice(e.price)}
+                                      </span>
+                                      <button
+                                        onClick={() => removeEntry(plan.id, e.id)}
+                                        className="p-1.5 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           );
@@ -340,11 +376,10 @@ export function PlannerClient({
         </div>
       </div>
 
-      {deletePlanUid &&
+      {deletePlanId !== null &&
         (() => {
-          const plan = plans.find((p) => p.uid === deletePlanUid);
+          const plan = plans.find((p) => p.id === deletePlanId);
           if (!plan) return null;
-          const count = entries.filter((e) => e.planUid === deletePlanUid).length;
           return (
             <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6">
               <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs shadow-2xl">
@@ -354,16 +389,16 @@ export function PlannerClient({
                 <p className="text-xs text-muted-foreground text-center mb-5 leading-relaxed">
                   <span className="text-foreground font-medium">&quot;{plan.title}&quot;</span>과
                   <br />
-                  담긴 굿즈 {count}개가 함께 삭제됩니다.
+                  담긴 굿즈 {plan.goodsCount}개가 함께 삭제됩니다.
                 </p>
                 <div className="flex gap-2">
-                  <button onClick={() => setDeletePlanUid(null)} className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-muted-foreground text-sm rounded-xl transition-colors font-medium">
+                  <button onClick={() => setDeletePlanId(null)} className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-muted-foreground text-sm rounded-xl transition-colors font-medium">
                     취소
                   </button>
                   <button
                     onClick={() => {
-                      removePlan(deletePlanUid);
-                      setDeletePlanUid(null);
+                      removePlan(deletePlanId);
+                      setDeletePlanId(null);
                     }}
                     className="flex-1 py-2.5 bg-red-500 hover:bg-red-400 text-white text-sm font-bold rounded-xl transition-colors"
                   >

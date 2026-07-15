@@ -1,18 +1,14 @@
 "use client";
 
-import { Clock, MapPin, Star } from "lucide-react";
-import type { AnimationData, StoreData } from "@/types/domain";
+import { Clock, MapPin } from "lucide-react";
+import type { StoreData } from "@/types/domain";
 import { TypeBadge } from "./TypeBadge";
 
-export function StoreCard({
-  store,
-  animations,
-  onClick,
-}: {
-  store: StoreData;
-  animations: AnimationData[];
-  onClick: () => void;
-}) {
+export function StoreCard({ store, onClick }: { store: StoreData; onClick: () => void }) {
+  // 실제 API엔 region 필드가 없어서(주소/좌표만 옴), 주소 첫 단어(보통
+  // 시/도명)를 지역 표시 대용으로 사용.
+  const regionLabel = store.address.split(" ")[0];
+
   return (
     <div
       onClick={onClick}
@@ -26,16 +22,12 @@ export function StoreCard({
           </h3>
           <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
             <MapPin size={9} className="shrink-0" />
-            {store.region} · {store.address.split(" ").slice(0, 3).join(" ")}
+            {regionLabel} · {store.address.split(" ").slice(0, 3).join(" ")}
           </p>
         </div>
-        <div className="text-right shrink-0 ml-2">
-          <div className="flex items-center gap-1 justify-end">
-            <Star size={11} className="text-amber-400 fill-amber-400" />
-            <span className="text-xs font-bold text-foreground">{store.rating}</span>
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">({store.reviewCount.toLocaleString()})</p>
-        </div>
+        {store.goodsCount !== undefined && (
+          <span className="text-[11px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full shrink-0 ml-2">{store.goodsCount}종</span>
+        )}
       </div>
       {store.type === "popup" && store.startDate && (
         <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1 font-mono">
@@ -43,15 +35,7 @@ export function StoreCard({
           {store.startDate} ~ {store.endDate}
         </p>
       )}
-      <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">{store.description}</p>
-      <div className="flex flex-wrap items-center gap-1">
-        {animations.slice(0, 3).map((a) => (
-          <span key={a.id} className="text-[10px] bg-white/5 border border-border px-1.5 py-0.5 rounded-full text-muted-foreground">
-            {a.emoji} {a.title}
-          </span>
-        ))}
-        {animations.length > 3 && <span className="text-[10px] text-muted-foreground">+{animations.length - 3}</span>}
-      </div>
+      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{store.description}</p>
     </div>
   );
 }

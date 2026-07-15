@@ -62,7 +62,6 @@ export function AnimCombobox({
                 onMouseDown={() => select(a.title)}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/5 transition-colors"
               >
-                <span className="text-base">{a.emoji}</span>
                 <span className="text-sm text-foreground font-medium">{a.title}</span>
               </button>
             ))

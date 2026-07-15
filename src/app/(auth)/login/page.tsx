@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { loginBusiness, loginMember } from "@/features/auth/api";
 import { AuthShell } from "@/features/auth/components/AuthShell";
 import { RoleSelector } from "@/features/auth/components/RoleSelector";
 import { isValidEmail } from "@/lib/helpers";
@@ -16,16 +17,27 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [errors, setErrors] = useState<{ email?: string; pw?: string }>({});
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs: { email?: string; pw?: string } = {};
     if (!isValidEmail(email)) errs.email = "올바른 이메일 형식을 입력해주세요";
     if (pw.length < 8) errs.pw = "비밀번호는 8자 이상이어야 합니다";
     setErrors(errs);
-    if (Object.keys(errs).length === 0) {
-      login(role, email);
-      router.push("/goods");
+    setFormError("");
+    if (Object.keys(errs).length > 0) return;
+
+    setSubmitting(true);
+    const result = role === "user" ? await loginMember({ email, password: pw }) : await loginBusiness({ email, password: pw });
+    setSubmitting(false);
+
+    if (!result.success) {
+      setFormError(result.message || "로그인에 실패했습니다");
+      return;
     }
+    login(role, email);
+    router.push("/goods");
   };
 
   return (
@@ -48,6 +60,7 @@ export default function LoginPage() {
             onChange={(e) => {
               setEmail(e.target.value);
               setErrors((v) => ({ ...v, email: undefined }));
+              setFormError("");
             }}
             placeholder="hello@example.com"
             className={`w-full bg-card border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors ${
@@ -64,6 +77,7 @@ export default function LoginPage() {
             onChange={(e) => {
               setPw(e.target.value);
               setErrors((v) => ({ ...v, pw: undefined }));
+              setFormError("");
             }}
             placeholder="••••••••"
             className={`w-full bg-card border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors ${
@@ -76,11 +90,14 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {formError && <p className="text-xs text-red-400 font-medium text-center">{formError}</p>}
+
         <button
           onClick={handleSubmit}
-          className="w-full py-3 mt-1 bg-violet-600 hover:bg-violet-500 text-white font-bold rounded-xl transition-colors shadow-xl shadow-violet-900/40 text-sm active:scale-[0.99]"
+          disabled={submitting}
+          className="w-full py-3 mt-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold rounded-xl transition-colors shadow-xl shadow-violet-900/40 text-sm active:scale-[0.99]"
         >
-          로그인
+          {submitting ? "로그인 중..." : "로그인"}
         </button>
       </div>
 

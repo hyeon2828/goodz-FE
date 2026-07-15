@@ -1,31 +1,57 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle, MapPin, Plus, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle, MapPin, Plus, Sparkles, X } from "lucide-react";
 import { fmtPrice } from "@/lib/helpers";
-import type { AnimationData, GoodsData, StoreData } from "@/types/domain";
+import { gradientForId } from "@/lib/gradient";
+import type { GoodsStoreOffer, PendingPlanItem } from "@/types/domain";
+import { getGoodsDetail } from "../api";
 import { StockBadge } from "./StockBadge";
-import { TypeBadge } from "./TypeBadge";
 
 export function GoodsDetailModal({
-  goods,
-  anim,
-  store,
+  goodsId,
   onAdd,
   onClose,
 }: {
-  goods: GoodsData;
-  anim: AnimationData;
-  store: StoreData;
-  onAdd: (g: GoodsData) => void;
+  goodsId: number;
+  onAdd: (item: PendingPlanItem) => void;
   onClose: () => void;
 }) {
-  const [addState, setAddState] = useState<"idle" | "added">("idle");
+  const [name, setName] = useState<string | null>(null);
+  const [animationTitle, setAnimationTitle] = useState("");
+  const [stores, setStores] = useState<GoodsStoreOffer[]>([]);
+  const [error, setError] = useState("");
+  const [addedStoreGoodsId, setAddedStoreGoodsId] = useState<number | null>(null);
 
-  const handleAdd = () => {
-    onAdd(goods);
-    setAddState("added");
-    setTimeout(() => setAddState("idle"), 2000);
+  useEffect(() => {
+    let cancelled = false;
+    getGoodsDetail(goodsId)
+      .then((detail) => {
+        if (cancelled) return;
+        setName(detail.name);
+        setAnimationTitle(detail.animationTitle);
+        setStores(detail.stores);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "굿즈 정보를 불러오지 못했습니다");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [goodsId]);
+
+  const handleAdd = (offer: GoodsStoreOffer) => {
+    if (!name) return;
+    onAdd({
+      storeGoodsId: offer.storeGoodsId,
+      goodsName: name,
+      animationTitle,
+      storeId: offer.storeId,
+      storeName: offer.storeName,
+      price: offer.price,
+    });
+    setAddedStoreGoodsId(offer.storeGoodsId);
+    setTimeout(() => setAddedStoreGoodsId(null), 2000);
   };
 
   return (
@@ -34,69 +60,72 @@ export function GoodsDetailModal({
       onClick={onClose}
     >
       <div
-        className="bg-card border border-border rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl overflow-hidden"
+        className="bg-card border border-border rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`relative h-40 sm:h-48 bg-gradient-to-br ${goods.gradient} flex items-center justify-center`}>
+        <div className={`relative h-32 sm:h-40 bg-gradient-to-br ${gradientForId(goodsId)} flex items-center justify-center shrink-0`}>
           <div className="absolute inset-0 bg-black/10" />
-          <span className="text-6xl sm:text-7xl drop-shadow-xl">{anim.emoji}</span>
+          <Sparkles size={48} className="text-white/70 drop-shadow-xl" />
           <button
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
           >
             <X size={15} />
           </button>
-          <div className="absolute bottom-3 left-3 flex items-center gap-2">
-            <span className="text-[11px] bg-black/40 backdrop-blur-sm text-white px-2 py-0.5 rounded-full font-medium">
-              {goods.category}
-            </span>
-            <StockBadge stock={goods.stock} />
-          </div>
         </div>
-        <div className="p-5">
-          <p className="text-xs text-muted-foreground mb-1 font-medium">
-            {anim.emoji} {anim.title}
-          </p>
-          <h2 className="text-base sm:text-lg font-bold text-foreground mb-1" style={{ fontFamily: "Outfit, sans-serif" }}>
-            {goods.name}
-          </h2>
-          {goods.description && (
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4">{goods.description}</p>
-          )}
-          <div className="flex items-center gap-2 py-3 border-t border-border mb-4">
-            <TypeBadge type={store.type} />
-            <span className="text-xs font-semibold text-foreground">{store.name}</span>
-            <span className="text-[11px] text-muted-foreground flex items-center gap-0.5 ml-auto">
-              <MapPin size={9} />
-              {store.address.split(" ").slice(0, 3).join(" ")}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[11px] text-muted-foreground">판매가</p>
-              <p className="text-xl font-bold text-foreground" style={{ fontFamily: "Outfit, sans-serif" }}>
-                {fmtPrice(goods.price)}
-              </p>
-            </div>
-            <button
-              onClick={handleAdd}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                addState === "added"
-                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
-                  : "bg-violet-600 hover:bg-violet-500 text-white shadow-lg shadow-violet-900/30"
-              }`}
-            >
-              {addState === "added" ? (
-                <>
-                  <CheckCircle size={15} /> 담김
-                </>
+        <div className="p-5 overflow-y-auto">
+          {error && <p className="text-sm text-red-400 text-center py-8">{error}</p>}
+          {!error && !name && <p className="text-sm text-muted-foreground text-center py-8">불러오는 중...</p>}
+          {name && (
+            <>
+              <p className="text-xs text-muted-foreground mb-1 font-medium">{animationTitle}</p>
+              <h2 className="text-base sm:text-lg font-bold text-foreground mb-4" style={{ fontFamily: "Outfit, sans-serif" }}>
+                {name}
+              </h2>
+              {stores.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">판매 중인 업체가 없습니다</p>
               ) : (
-                <>
-                  <Plus size={15} /> 플래너에 담기
-                </>
+                <div className="space-y-2">
+                  <p className="text-[11px] text-muted-foreground font-semibold mb-1">판매 업체 {stores.length}곳</p>
+                  {stores.map((offer) => (
+                    <div key={offer.storeGoodsId} className="border border-border rounded-xl p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{offer.storeName}</p>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                          <MapPin size={9} className="shrink-0" />
+                          {offer.address}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm font-bold text-foreground" style={{ fontFamily: "Outfit, sans-serif" }}>
+                            {fmtPrice(offer.price)}
+                          </span>
+                          <StockBadge stock={offer.stock} />
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAdd(offer)}
+                        className={`flex items-center gap-1 text-[11px] px-3 py-2 rounded-lg font-semibold transition-all shrink-0 ${
+                          addedStoreGoodsId === offer.storeGoodsId
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/25"
+                            : "bg-violet-600 hover:bg-violet-500 text-white"
+                        }`}
+                      >
+                        {addedStoreGoodsId === offer.storeGoodsId ? (
+                          <>
+                            <CheckCircle size={13} /> 담김
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={13} /> 담기
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
-            </button>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
