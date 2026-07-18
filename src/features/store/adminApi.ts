@@ -1,10 +1,5 @@
 import type { StoreAdmin, StoreData, StoreGoodsItem, StoreType } from "@/types/domain";
 
-// 관리자 대시보드(업체 등록/수정, 관리자 초대, 굿즈 CRUD, 이미지 업로드)
-// 전용 — 전부 JWT 필요라 같은 origin의 Route Handler(app/api/stores/*)만
-// 호출함(features/store/api.ts의 공개 조회 함수들과 달리 Spring Boot를
-// 직접 부르지 않음).
-
 interface ApiResult<T = undefined> {
   success: boolean;
   message: string;
@@ -93,10 +88,6 @@ function setStoreGoodsImagePath(storeId: number, storeGoodsId: number, imagePath
   });
 }
 
-// presigned URL 발급 → S3 직접 업로드 → 최종 경로 등록, 3단계를 한 번에
-// 처리. 중간 단계 실패 시 어느 단계에서 멈췄는지 메시지로 구분해서
-// 반환(호출부가 "굿즈는 등록됐지만 이미지 업로드에 실패했습니다" 같은
-// 안내를 붙일 수 있게).
 export async function uploadStoreGoodsImage(storeId: number, storeGoodsId: number, file: File): Promise<ApiResult<{ imagePath: string }>> {
   const presigned = await getPresignedUploadUrl(storeId, storeGoodsId, file);
   if (!presigned.success || !presigned.data) {

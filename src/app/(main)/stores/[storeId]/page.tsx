@@ -17,7 +17,6 @@ export default async function StoreDetailPage({ params }: { params: Promise<{ st
       </div>
     );
   }
-  // getStoreById는 404일 때만 null을 반환(그 외 에러는 위에서 이미 처리)
   if (!storeResult.data) notFound();
 
   const goodsResult = await safeFetch(getStoreGoods(storeResult.data.id), []);

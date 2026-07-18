@@ -12,9 +12,6 @@ export interface GoodsFormState {
   stock: string;
 }
 
-// 굿즈 사진은 실제 업로드(presigned URL)에 원본 File이 필요해서 base64
-// 미리보기 문자열이 아니라 File 자체를 폼 상태로 들고 있음 — 미리보기는
-// URL.createObjectURL로 그때그때 생성.
 export function GoodsFormFields({
   form,
   setForm,

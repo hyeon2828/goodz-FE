@@ -38,8 +38,6 @@ function VerifyEmailForm() {
     const result = await verifyEmail({ email, authCode: code.join("") });
     if (result.success) {
       setVerifyState("success");
-      // verify-email은 이메일 인증만 확인할 뿐 토큰을 안 돌려줌 —
-      // 실제 로그인은 이 방금 만든 계정으로 별도로 해야 함.
       setTimeout(() => router.push("/login"), 800);
     } else {
       setVerifyState("error");

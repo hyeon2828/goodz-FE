@@ -17,8 +17,7 @@ export function AnimCombobox({
   const [prevValue, setPrevValue] = useState(value);
   const ref = useRef<HTMLDivElement>(null);
 
-  // `value`가 외부에서 변경(예: 폼 리셋)될 때 effect 없이 input 동기화 —
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  // 의도적인 렌더 중 setState — https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   if (value !== prevValue) {
     setPrevValue(value);
     setInputVal(value);

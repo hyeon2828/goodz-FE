@@ -43,9 +43,6 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   };
 
-  // 로그인 상태가 되면(최초 세션 복원 포함) 목록을 불러오고, 로그아웃하면
-  // 비움 — 안 비우면 다음에 로그인하는 다른 계정 화면에 이전 사용자의
-  // 플랜이 잠깐 보일 수 있음.
   useEffect(() => {
     if (loggedIn) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -63,8 +60,6 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     return { success: result.success, message: result.message };
   };
 
-  // 롤백 없음: 1단계(플랜 생성)가 성공한 뒤 2단계(굿즈 담기)가 실패해도
-  // 플랜 자체는 남겨둠 — 사용자가 상황을 알 수 있게 전용 메시지로 안내.
   const createPlanWithEntry = async (title: string, date: string, item: PendingPlanItem): Promise<ActionResult> => {
     const planResult = await createPlanner(title, date);
     if (!planResult.success || !planResult.data) {

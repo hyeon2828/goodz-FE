@@ -24,8 +24,6 @@ export function StoreDetailClient({
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [pendingItem, setPendingItem] = useState<PendingPlanItem | null>(null);
 
-  // StoreGoodsItem에 animationTitle이 이미 포함돼 있어 별도 조회 없이 바로
-  // 이 업체가 취급하는 작품 목록을 뽑을 수 있음.
   const animationTitles = [...new Set(storeGoods.map((g) => g.animationTitle))];
 
   const handleAdd = (item: StoreGoodsItem) => {

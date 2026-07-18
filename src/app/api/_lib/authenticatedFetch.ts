@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { API_BASE_URL } from "@/lib/env";
 import { ACCESS_TOKEN_COOKIE } from "@/app/api/auth/_lib/springBoot";
 
-// app/api/auth 바깥의 인증 필요 엔드포인트(플래너 등)가 공통으로 쓰는
-// 헬퍼 — 요청에 실린 httpOnly 액세스 토큰 쿠키를 읽어 Authorization
-// 헤더로 실어서 Spring Boot를 호출함. 쿠키가 아예 없으면(로그인 안 함)
-// Spring Boot까지 갈 필요 없이 바로 401.
-
 export interface SpringBootEnvelope<T = unknown> {
   success: boolean;
   data: T;
@@ -32,7 +27,7 @@ export async function callSpringBootAuthenticated<T = unknown>(
   try {
     body = (await res.json()) as SpringBootEnvelope<T>;
   } catch {
-    // 처리되지 않은 예외의 HTML 에러 페이지 등 JSON이 아닌 응답 대비.
+    // JSON이 아닌 응답(예: 처리되지 않은 예외의 HTML 에러 페이지) 대비.
   }
   return { ok: res.ok, status: res.status, body };
 }

@@ -5,8 +5,6 @@ import type { StoreData } from "@/types/domain";
 import { TypeBadge } from "./TypeBadge";
 
 export function StoreCard({ store, onClick }: { store: StoreData; onClick: () => void }) {
-  // 실제 API엔 region 필드가 없어서(주소/좌표만 옴), 주소 첫 단어(보통
-  // 시/도명)를 지역 표시 대용으로 사용.
   const regionLabel = store.address.split(" ")[0];
 
   return (

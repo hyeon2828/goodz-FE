@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Filter, LayoutList, Map as MapIcon, Search } from "lucide-react";
 import { LoginPromptModal } from "@/components/common/LoginPromptModal";
-import { MockMap } from "@/components/map/MockMap";
+import { KakaoMap } from "@/components/map/KakaoMap";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { GoodsCard } from "@/features/goods/components/GoodsCard";
 import { GoodsDetailModal } from "@/features/goods/components/GoodsDetailModal";
@@ -50,17 +50,12 @@ export function ExploreClient({
   const [stores, setStores] = useState(initialStores);
   const [storesError, setStoresError] = useState(initialStoresError ?? null);
 
-  // 검색어는 300ms 디바운스 — 타이핑마다 서버에 쿼리 안 날림.
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  // 작품/지역 필터, 검색어는 API가 서버에서 걸러줌 — 목록엔 그걸 필터링할
-  // region/storeId 같은 필드 자체가 없어서(GoodsSummary/StoreData 실제
-  // 스키마 참고) 클라이언트 필터링이 불가능해짐.
-  // goods/stores 조회를 따로 처리 — 하나가 실패해도 다른 하나는 정상
-  // 반영되도록(둘을 Promise.all로 묶으면 하나만 실패해도 둘 다 못 씀).
+  // goods/stores를 Promise.all로 묶지 않음 — 하나가 실패해도 다른 하나는 반영되게.
   useEffect(() => {
     let cancelled = false;
     const params = {
@@ -318,7 +313,7 @@ export function ExploreClient({
         ) : (
           <div className="flex flex-col md:flex-row gap-3 md:gap-4">
             <div className="w-full md:flex-1 h-72 md:h-[560px] rounded-xl overflow-hidden">
-              <MockMap stores={stores} onSelect={goToStore} />
+              <KakaoMap stores={stores} onSelect={goToStore} />
             </div>
             <div className="w-full md:w-72 max-h-72 md:max-h-[560px] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 pb-2">
               {stores.map((s) => (

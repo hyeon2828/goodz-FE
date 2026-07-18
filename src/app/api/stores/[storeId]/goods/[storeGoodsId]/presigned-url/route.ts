@@ -7,10 +7,7 @@ interface PresignedUploadResponse {
   expiresAt: string;
 }
 
-// 발급받은 uploadUrl은 이 Route Handler를 거치지 않고 브라우저가 S3로
-// 직접 PUT함(presigned URL 자체가 인증이라 JWT 불필요, 서버가 파일
-// 바이트를 중계할 필요도 없음) — 이 엔드포인트는 그 URL을 받아오는
-// 것까지만 담당.
+// 발급받은 uploadUrl로는 브라우저가 S3에 직접 PUT함(이 Route Handler를 안 거침).
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ storeId: string; storeGoodsId: string }> }

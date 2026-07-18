@@ -1,7 +1,6 @@
 import { ApiError, fetchApi } from "@/lib/apiClient";
 import type { StoreData, StoreGoodsItem, StoreMapItem, StoreType } from "@/types/domain";
 
-// 백엔드 enum(POPUP/STORE) ↔ 프론트 표기(popup/permanent).
 function mapStoreType(raw: string): StoreType {
   return raw === "POPUP" ? "popup" : "permanent";
 }
@@ -24,9 +23,8 @@ export async function getStores(params: { animationId?: number; region?: string;
   return raw.map(normalizeStore);
 }
 
-// 404("존재하지 않는 업체")만 null로 삼키고, 그 외(500/403 등 서버·설정
-// 버그)는 그대로 던짐 — 호출부가 "없는 업체"와 "서버 에러"를 구분해서
-// 다른 화면을 보여줄 수 있게 함.
+// 404만 null로 삼키고 그 외(500/403 등)는 그대로 던짐 — 호출부가 "없는 업체"와
+// "서버 에러"를 구분할 수 있게.
 export async function getStoreById(storeId: number): Promise<StoreData | null> {
   try {
     const raw = await fetchApi<RawStore>(`/api/v1/stores/${storeId}`);

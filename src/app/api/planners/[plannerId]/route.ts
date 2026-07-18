@@ -17,8 +17,6 @@ interface RawPlannerDetail {
   goods: RawPlannerGoods[];
 }
 
-// Spring Boot 상세 응답은 store가 중첩 객체로 옴 — 프론트 PlanEntry는
-// storeId/storeName으로 평탄화해서 쓰므로 여기서 미리 변환.
 function normalizeDetail(raw: RawPlannerDetail) {
   return {
     id: raw.id,

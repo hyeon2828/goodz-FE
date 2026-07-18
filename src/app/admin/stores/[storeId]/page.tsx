@@ -35,7 +35,6 @@ export default function AdminStoreDetailPage() {
 
   const [pageNotice, setPageNotice] = useState("");
 
-  // 관리자 목록 (메인 관리자만 조회 — 서브 관리자는 이 섹션 자체를 못 봄)
   const [admins, setAdmins] = useState<StoreAdmin[]>([]);
   const [adminsError, setAdminsError] = useState<string | null>(null);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
@@ -48,8 +47,6 @@ export default function AdminStoreDetailPage() {
     if (!store || !isMainAdmin) return;
     getStoreAdmins(store.id).then((result) => {
       if (result.success && result.data) {
-        // 응답에 본인(메인 관리자)이 포함돼 내려올 가능성 방어 — 본인은
-        // 화면에서 별도 고정 행으로 보여주므로 목록에선 제외.
         setAdmins(result.data.filter((a) => a.email !== userEmail));
         setAdminsError(null);
       } else {
@@ -58,8 +55,6 @@ export default function AdminStoreDetailPage() {
     });
   }, [store, isMainAdmin, userEmail]);
 
-  // 굿즈 목록 — 공개 조회 엔드포인트를 그대로 재사용(관리자 전용
-  // 별도 조회가 없어도 되는 동일 데이터).
   const [goods, setGoods] = useState<StoreGoodsItem[]>([]);
   const [goodsLoading, setGoodsLoading] = useState(false);
   const [goodsError, setGoodsError] = useState<string | null>(null);
@@ -99,8 +94,6 @@ export default function AdminStoreDetailPage() {
     };
   }, [editImagePreviewUrl]);
 
-  // getAnimations()는 공개 굿즈 카탈로그 조회라 JWT 불필요 — 새 굿즈 등록
-  // 폼의 "원작 작품" 콤보박스가 실제 animationId를 골라야 해서 필요.
   const [animations, setAnimations] = useState<AnimationData[]>([]);
   useEffect(() => {
     getAnimations().then(setAnimations);
@@ -109,13 +102,9 @@ export default function AdminStoreDetailPage() {
   if (!loggedIn) {
     return <DashboardAccessDenied onGoAuth={() => router.push("/signup")} />;
   }
-  // 목록이 아직 첫 로딩 중일 때는(특히 이 URL로 바로 들어온 경우)
-  // "권한 없음" 화면이 잠깐 잘못 뜨는 걸 막기 위해 로딩 상태를 먼저 확인.
   if (storesLoading && managedStores.length === 0) {
     return <div className="min-h-screen bg-background pt-14 md:pt-16" />;
   }
-  // GET /stores/admin이 이미 "내가 관리하는 업체"만 서버에서 스코핑해서
-  // 내려주므로, 이 목록 안에 store가 있다는 것 자체가 접근 권한 증명임.
   const canAccessStore = (isMainAdmin || isSubAdmin) && !!store;
   if (!canAccessStore || !store) {
     return <DashboardAccessDenied onGoAuth={() => router.push("/signup")} />;

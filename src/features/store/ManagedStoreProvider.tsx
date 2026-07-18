@@ -89,10 +89,6 @@ export function useManagedStores() {
   return ctx;
 }
 
-// GET /stores/admin이 role과 무관하게 "내가 관리하는 업체"를 서버에서
-// 이미 스코핑해서 내려줌 — user(개인) role이 이 목록에 하나라도 있다는
-// 건 어딘가의 서브 관리자로 배정됐다는 뜻(개인 role은 업체를 직접 소유할
-// 수 없으므로).
 export function useIsSubAdmin() {
   const { userRole } = useAuth();
   const { managedStores } = useManagedStores();

@@ -4,9 +4,6 @@ import { Sparkles } from "lucide-react";
 import { gradientForId } from "@/lib/gradient";
 import type { GoodsSummary } from "@/types/domain";
 
-// 목록(/goods, /goods/search) 전용 — 가격/재고/업체 정보가 API에 없어서
-// 최소 정보(이름+작품명)만 보여주고 클릭하면 상세(GoodsDetailModal)로
-// 이동. 업체별 가격은 상세에서만 알 수 있음.
 export function GoodsCard({ goods, onClick }: { goods: GoodsSummary; onClick: () => void }) {
   return (
     <div

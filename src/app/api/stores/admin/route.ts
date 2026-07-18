@@ -14,8 +14,6 @@ interface RawStoreResponse {
   lng: number;
 }
 
-// 로그인한 사용자가 관리하는(메인 관리자 또는 서브 관리자로 배정된) 업체
-// 목록 — role(개인/업체)과 무관하게 서버가 JWT로 스코핑해서 내려줌.
 export async function GET(request: NextRequest) {
   try {
     const { ok, status, body } = await callSpringBootAuthenticated<RawStoreResponse[]>(request, "/api/v1/stores/admin");

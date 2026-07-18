@@ -55,8 +55,6 @@ export default function AdminStoresPage() {
     return <DashboardAccessDenied onGoAuth={() => router.push("/signup")} />;
   }
 
-  // GET /stores/admin이 role과 무관하게 "내가 관리하는 업체"만 이미
-  // 서버에서 스코핑해서 내려주므로 클라이언트에서 추가로 거를 게 없음.
   const visibleStores = managedStores;
 
   return (

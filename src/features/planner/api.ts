@@ -1,9 +1,5 @@
 import type { Plan, PlanEntry } from "@/types/domain";
 
-// 인증이 필요한 플래너 API 전용 — 같은 origin의 Route Handler(app/api/planners/*)만
-// 호출함. httpOnly 토큰 쿠키는 브라우저 JS가 못 읽으므로 Authorization 헤더는
-// Route Handler가 서버 사이드에서 붙임(app/api/_lib/authenticatedFetch.ts).
-
 interface ApiResult<T = undefined> {
   success: boolean;
   message: string;

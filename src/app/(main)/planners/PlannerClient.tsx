@@ -117,9 +117,7 @@ export function PlannerClient() {
   const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
   const dayPlans = plans.filter((p) => p.date === selectedDateStr);
 
-  // plan 상세(담긴 굿즈 목록)는 목록 응답에 없어서 화면에 보이는 날짜의
-  // 플랜만 따로 조회함. plans가 갱신될 때마다(추가/삭제 등) 다시 불러와서
-  // 최신 상태를 반영.
+  // 담긴 굿즈 목록은 플랜 목록 응답에 없어서 화면에 보이는 날짜의 플랜만 따로 조회함.
   const [planGoods, setPlanGoods] = useState<Record<number, PlanEntry[]>>({});
   const [detailLoading, setDetailLoading] = useState<Record<number, boolean>>({});
   const [detailError, setDetailError] = useState<Record<number, string>>({});

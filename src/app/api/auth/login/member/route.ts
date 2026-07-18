@@ -8,7 +8,6 @@ interface LoginTokens {
 
 export async function POST(request: Request) {
   const { email, password } = await request.json();
-  // role은 이 라우트 전용 고정값 — 개인 회원 로그인은 항상 USER.
   const { ok, status, body: result } = await callSpringBoot<LoginTokens>("/api/v1/auth/login/member", {
     method: "POST",
     body: JSON.stringify({ email, password, role: "USER" }),

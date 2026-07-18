@@ -7,8 +7,6 @@ import { gradientForId } from "@/lib/gradient";
 import type { StoreGoodsItem } from "@/types/domain";
 import { StockBadge } from "./StockBadge";
 
-// 업체 상세(/stores/[storeId]) 전용 — StoreGoodsItem엔 이미 가격/재고가
-// 업체 하나로 좁혀져 있어서 GoodsCard(목록)와 달리 바로 보여줄 수 있음.
 export function StoreGoodsCard({
   item,
   onAdd,

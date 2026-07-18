@@ -1,10 +1,3 @@
-// 브라우저에서 부르는 클라이언트 계층 — Spring Boot(api.pinnedsignal.site)를
-// 직접 호출하지 않고, 항상 같은 출처의 app/api/auth/*/route.ts를 호출함
-// (그래서 CORS 대상 아님, 토큰은 그 Route Handler가 httpOnly 쿠키로 관리).
-// role(USER/STORE) 매핑도 Route Handler 쪽 고정값으로 처리되어 있어서
-// 여기서는 신경 쓸 필요 없음 — loginMember/loginBusiness를 어떤 걸
-// 호출하느냐로 이미 역할이 정해짐.
-
 interface ApiResult<T = undefined> {
   success: boolean;
   message: string;

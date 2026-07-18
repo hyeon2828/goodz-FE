@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { callSpringBootAuthenticated, UnauthenticatedError, unauthenticatedResponse } from "@/app/api/_lib/authenticatedFetch";
 import { normalizeStoreGoods, type RawStoreGoodsResponse } from "@/app/api/stores/_lib/normalize";
 
-// 재고 수정(PATCH) 전용 — 굿즈명/작품은 카탈로그 쪽 데이터라 이 엔드포인트로
-// 못 바꿈(price/stock/imagePath만 매장별로 다른 값).
+// 굿즈명/작품은 카탈로그 쪽 데이터라 이 엔드포인트로 못 바꿈(price/stock/imagePath만 가능).
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ storeId: string; storeGoodsId: string }> }

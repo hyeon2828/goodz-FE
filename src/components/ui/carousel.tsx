@@ -95,8 +95,6 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return;
-    // embla-carousel 인스턴스(외부 시스템)에서 마운트 시 초기 상태 동기화,
-    // 아래 change 이벤트 구독 전에 실행.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     onSelect(api);
     api.on("reInit", onSelect);
