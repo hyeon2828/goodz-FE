@@ -11,6 +11,7 @@ export interface GoodsSummary {
   name: string;
   animationId: number;
   animationTitle: string;
+  imageUrls: string[];
 }
 
 export interface GoodsStoreOffer {
