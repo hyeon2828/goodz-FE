@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { SESSION_EXPIRED_EVENT } from "@/lib/authenticatedApi";
 import type { UserRole } from "@/types/domain";
 import { logout as logoutRequest } from "./api";
 
@@ -27,6 +29,7 @@ function readSessionHint(): { role: UserRole; email: string } | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
   const [loggedIn, setLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userEmail, setUserEmail] = useState("");
@@ -39,6 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserRole(hint.role);
     setUserEmail(hint.email);
   }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setLoggedIn(false);
+      setUserRole(null);
+      setUserEmail("");
+      router.replace("/login");
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, [router]);
 
   const login = (role: UserRole, email: string) => {
     setLoggedIn(true);

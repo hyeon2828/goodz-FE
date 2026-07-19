@@ -1,23 +1,5 @@
 import type { StoreAdmin, StoreData, StoreGoodsItem, StoreType } from "@/types/domain";
-
-interface ApiResult<T = undefined> {
-  success: boolean;
-  message: string;
-  data?: T;
-}
-
-async function callLocalRoute<T = undefined>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
-  try {
-    const res = await fetch(path, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-      credentials: "include",
-    });
-    return (await res.json()) as ApiResult<T>;
-  } catch {
-    return { success: false, message: "네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요." };
-  }
-}
+import { callAuthenticatedRoute, type ApiResult } from "@/lib/authenticatedApi";
 
 interface StoreInput {
   name: string;
@@ -29,43 +11,43 @@ interface StoreInput {
 }
 
 export function createStore(input: StoreInput) {
-  return callLocalRoute<StoreData>("/api/stores", { method: "POST", body: JSON.stringify(input) });
+  return callAuthenticatedRoute<StoreData>("/api/stores", { method: "POST", body: JSON.stringify(input) });
 }
 
 export function getManagedStores() {
-  return callLocalRoute<StoreData[]>("/api/stores/admin");
+  return callAuthenticatedRoute<StoreData[]>("/api/stores/admin");
 }
 
 export function getManagedStoreDetail(storeId: number) {
-  return callLocalRoute<StoreData>(`/api/stores/${storeId}`);
+  return callAuthenticatedRoute<StoreData>(`/api/stores/${storeId}`);
 }
 
 export function updateStore(storeId: number, input: StoreInput) {
-  return callLocalRoute<StoreData>(`/api/stores/${storeId}`, { method: "PATCH", body: JSON.stringify(input) });
+  return callAuthenticatedRoute<StoreData>(`/api/stores/${storeId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
 export function getStoreAdmins(storeId: number) {
-  return callLocalRoute<StoreAdmin[]>(`/api/stores/${storeId}/admin`);
+  return callAuthenticatedRoute<StoreAdmin[]>(`/api/stores/${storeId}/admin`);
 }
 
 export function addStoreAdmin(storeId: number, email: string) {
-  return callLocalRoute<StoreAdmin>(`/api/stores/${storeId}/admin`, { method: "POST", body: JSON.stringify({ email }) });
+  return callAuthenticatedRoute<StoreAdmin>(`/api/stores/${storeId}/admin`, { method: "POST", body: JSON.stringify({ email }) });
 }
 
 export function removeStoreAdmin(storeId: number, storeAdminId: number) {
-  return callLocalRoute(`/api/stores/${storeId}/admin/${storeAdminId}`, { method: "DELETE" });
+  return callAuthenticatedRoute(`/api/stores/${storeId}/admin/${storeAdminId}`, { method: "DELETE" });
 }
 
 export function createStoreGoods(storeId: number, input: { animationId: number; name: string; price: number; stock: number }) {
-  return callLocalRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods/new`, { method: "POST", body: JSON.stringify(input) });
+  return callAuthenticatedRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods/new`, { method: "POST", body: JSON.stringify(input) });
 }
 
 export function updateStoreGoods(storeId: number, storeGoodsId: number, input: { price: number; stock: number; imagePath?: string }) {
-  return callLocalRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods/${storeGoodsId}`, { method: "PATCH", body: JSON.stringify(input) });
+  return callAuthenticatedRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods/${storeGoodsId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
 export function deleteStoreGoods(storeId: number, storeGoodsId: number) {
-  return callLocalRoute(`/api/stores/${storeId}/goods/${storeGoodsId}`, { method: "DELETE" });
+  return callAuthenticatedRoute(`/api/stores/${storeId}/goods/${storeGoodsId}`, { method: "DELETE" });
 }
 
 interface PresignedUploadData {
@@ -75,14 +57,14 @@ interface PresignedUploadData {
 }
 
 function getPresignedUploadUrl(storeId: number, storeGoodsId: number, file: File) {
-  return callLocalRoute<PresignedUploadData>(`/api/stores/${storeId}/goods/${storeGoodsId}/presigned-url`, {
+  return callAuthenticatedRoute<PresignedUploadData>(`/api/stores/${storeId}/goods/${storeGoodsId}/presigned-url`, {
     method: "POST",
     body: JSON.stringify({ fileName: file.name, contentType: file.type, fileSize: file.size }),
   });
 }
 
 function setStoreGoodsImagePath(storeId: number, storeGoodsId: number, imagePath: string) {
-  return callLocalRoute(`/api/stores/${storeId}/goods/${storeGoodsId}/image-path`, {
+  return callAuthenticatedRoute(`/api/stores/${storeId}/goods/${storeGoodsId}/image-path`, {
     method: "PUT",
     body: JSON.stringify({ imagePath }),
   });
