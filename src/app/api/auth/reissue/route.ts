@@ -9,7 +9,9 @@ interface LoginTokens {
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get(REFRESH_TOKEN_COOKIE)?.value;
   if (!refreshToken) {
-    return NextResponse.json({ success: false, message: "로그인이 필요합니다." }, { status: 401 });
+    const response = NextResponse.json({ success: false, message: "로그인이 필요합니다." }, { status: 401 });
+    clearAllAuthCookies(response);
+    return response;
   }
 
   const { ok, status, body: result } = await callSpringBoot<LoginTokens>("/api/v1/auth/reissue", {
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
       { success: false, message: result?.message ?? "세션이 만료됐습니다. 다시 로그인해주세요." },
       { status: ok ? 401 : status }
     );
-    clearAllAuthCookies(response);
+    if (ok || status === 401 || status === 403) clearAllAuthCookies(response);
     return response;
   }
 

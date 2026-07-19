@@ -1,3 +1,5 @@
+import { beginAuthTransition, endAuthTransition } from "@/lib/authenticatedApi";
+
 interface ApiResult<T = undefined> {
   success: boolean;
   message: string;
@@ -37,18 +39,33 @@ export function verifyEmail(input: { email: string; authCode: string }) {
   return postJson("/api/auth/verify-email", input);
 }
 
-export function loginMember(input: { email: string; password: string }) {
-  return postJson("/api/auth/login/member", input);
+export async function loginMember(input: { email: string; password: string }) {
+  await beginAuthTransition();
+  try {
+    return await postJson("/api/auth/login/member", input);
+  } finally {
+    endAuthTransition();
+  }
 }
 
-export function loginBusiness(input: { email: string; password: string }) {
-  return postJson("/api/auth/login/business", input);
+export async function loginBusiness(input: { email: string; password: string }) {
+  await beginAuthTransition();
+  try {
+    return await postJson("/api/auth/login/business", input);
+  } finally {
+    endAuthTransition();
+  }
 }
 
 export function reissueToken() {
   return postJson("/api/auth/reissue", {});
 }
 
-export function logout() {
-  return postJson("/api/auth/logout", {});
+export async function logout() {
+  await beginAuthTransition();
+  try {
+    return await postJson("/api/auth/logout", {});
+  } finally {
+    endAuthTransition();
+  }
 }
