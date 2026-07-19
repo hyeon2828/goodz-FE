@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { addPlannerGoods, createPlanner, deletePlanner, getPlanners, removePlannerGoods } from "./api";
 import type { PendingPlanItem, Plan } from "@/types/domain";
@@ -31,6 +31,19 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
   const [totalPlans, setTotalPlans] = useState(0);
   const [visitDays, setVisitDays] = useState(0);
   const [loading, setLoading] = useState(false);
+  const createRequests = useRef(new Map<string, Promise<ActionResult>>());
+
+  const runCreateOnce = (key: string, create: () => Promise<ActionResult>) => {
+    const pendingRequest = createRequests.current.get(key);
+    if (pendingRequest) return pendingRequest;
+
+    const request = create();
+    createRequests.current.set(key, request);
+    void request.finally(() => {
+      if (createRequests.current.get(key) === request) createRequests.current.delete(key);
+    });
+    return request;
+  };
 
   const refreshPlans = async () => {
     setLoading(true);
@@ -54,24 +67,26 @@ export function PlannerProvider({ children }: { children: ReactNode }) {
     }
   }, [loggedIn]);
 
-  const createEmptyPlan = async (title: string, date: string): Promise<ActionResult> => {
-    const result = await createPlanner(title, date);
-    if (result.success) await refreshPlans();
-    return { success: result.success, message: result.message };
-  };
+  const createEmptyPlan = (title: string, date: string) =>
+    runCreateOnce(JSON.stringify(["empty", title, date]), async () => {
+      const result = await createPlanner(title, date);
+      if (result.success) await refreshPlans();
+      return { success: result.success, message: result.message };
+    });
 
-  const createPlanWithEntry = async (title: string, date: string, item: PendingPlanItem): Promise<ActionResult> => {
-    const planResult = await createPlanner(title, date);
-    if (!planResult.success || !planResult.data) {
-      return { success: false, message: planResult.message || "플랜 생성에 실패했습니다." };
-    }
-    const entryResult = await addPlannerGoods(planResult.data.id, date, item.storeGoodsId);
-    await refreshPlans();
-    if (!entryResult.success) {
-      return { success: false, message: "플랜은 생성됐지만 굿즈 담기에 실패했습니다" };
-    }
-    return { success: true, message: entryResult.message };
-  };
+  const createPlanWithEntry = (title: string, date: string, item: PendingPlanItem) =>
+    runCreateOnce(JSON.stringify(["with-entry", title, date, item.storeGoodsId]), async () => {
+      const planResult = await createPlanner(title, date);
+      if (!planResult.success || !planResult.data) {
+        return { success: false, message: planResult.message || "플랜 생성에 실패했습니다." };
+      }
+      const entryResult = await addPlannerGoods(planResult.data.id, date, item.storeGoodsId);
+      await refreshPlans();
+      if (!entryResult.success) {
+        return { success: false, message: "플랜은 생성됐지만 굿즈 담기에 실패했습니다" };
+      }
+      return { success: true, message: entryResult.message };
+    });
 
   const addEntryToPlan = async (plannerId: number, date: string, item: PendingPlanItem): Promise<ActionResult> => {
     const result = await addPlannerGoods(plannerId, date, item.storeGoodsId);
