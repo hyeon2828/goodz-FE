@@ -32,12 +32,12 @@ export function GoodsCard({ goods, onClick }: { goods: GoodsSummary; onClick: ()
       className="bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:border-violet-500/30 hover:shadow-xl hover:shadow-violet-950/20 group cursor-pointer"
     >
       {goods.imageUrls.length > 0 ? (
-        <Carousel setApi={setCarouselApi} opts={{ loop: hasMultipleImages }} className="relative h-36 sm:h-44">
+        <Carousel setApi={setCarouselApi} opts={{ loop: hasMultipleImages }} className="relative h-36 bg-white sm:h-44">
           <CarouselContent className="h-36 sm:h-44 ml-0">
             {goods.imageUrls.map((imageUrl, index) => (
               <CarouselItem key={`${imageUrl}-${index}`} className="h-36 sm:h-44 pl-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt={`${goods.name} 이미지 ${index + 1}`} loading="lazy" className="h-full w-full object-cover" />
+                <img src={imageUrl} alt={`${goods.name} 이미지 ${index + 1}`} loading="lazy" className="h-full w-full object-contain" />
               </CarouselItem>
             ))}
           </CarouselContent>

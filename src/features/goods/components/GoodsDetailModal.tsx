@@ -86,12 +86,12 @@ export function GoodsDetailModal({
       >
         <div className="relative shrink-0">
           {imageUrls.length > 0 ? (
-            <Carousel setApi={setCarouselApi} opts={{ loop: hasMultipleImages }} className="group h-32 sm:h-40">
+            <Carousel setApi={setCarouselApi} opts={{ loop: hasMultipleImages }} className="group h-32 bg-white sm:h-40">
               <CarouselContent className="ml-0 h-32 sm:h-40">
                 {imageUrls.map((imageUrl, index) => (
                   <CarouselItem key={`${imageUrl}-${index}`} className="h-32 pl-0 sm:h-40">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageUrl} alt={`${name ?? "굿즈"} 이미지 ${index + 1}`} className="h-full w-full object-cover" />
+                    <img src={imageUrl} alt={`${name ?? "굿즈"} 이미지 ${index + 1}`} className="h-full w-full object-contain" />
                   </CarouselItem>
                 ))}
               </CarouselContent>
