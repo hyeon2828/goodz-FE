@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Filter, LayoutList, Map as MapIcon, Search } from "lucide-react";
 import { LoginPromptModal } from "@/components/common/LoginPromptModal";
 import { KakaoMap } from "@/components/map/KakaoMap";
@@ -265,7 +266,24 @@ export function ExploreClient({
         {detailGoods && (
           <GoodsDetailModal goodsId={detailGoods.id} imageUrls={detailGoods.imageUrls} onAdd={(item) => setPendingItem(item)} onClose={() => setDetailGoods(null)} />
         )}
-        {pendingItem && <AddToPlanModal item={pendingItem} onClose={() => setPendingItem(null)} />}
+        {pendingItem && (
+          <AddToPlanModal
+            item={pendingItem}
+            onClose={() => setPendingItem(null)}
+            onSuccess={(date) => {
+              setDetailGoods(null);
+              const [, month, day] = date.split("-").map(Number);
+              toast.success("굿즈를 플랜에 담았습니다", {
+                description: `${month}월 ${day}일 플랜을 확인하시겠어요?`,
+                action: {
+                  label: "플랜 보기",
+                  onClick: () => router.push(`/planners?date=${date}`),
+                },
+                duration: 10000,
+              });
+            }}
+          />
+        )}
 
         {viewMode === "list" ? (
           tab === "goods" ? (

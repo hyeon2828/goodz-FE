@@ -7,7 +7,7 @@ import { gradientForId } from "@/lib/gradient";
 import { usePlanner } from "../PlannerProvider";
 import type { PendingPlanItem } from "@/types/domain";
 
-export function AddToPlanModal({ item, onClose }: { item: PendingPlanItem; onClose: () => void }) {
+export function AddToPlanModal({ item, onClose, onSuccess }: { item: PendingPlanItem; onClose: () => void; onSuccess?: (date: string) => void }) {
   const { plans, createPlanWithEntry, addEntryToPlan } = usePlanner();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [mode, setMode] = useState<"new" | "existing">("new");
@@ -52,6 +52,7 @@ export function AddToPlanModal({ item, onClose }: { item: PendingPlanItem; onClo
       }
     }
     onClose();
+    onSuccess?.(date);
   };
 
   return (
