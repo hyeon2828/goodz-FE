@@ -1,9 +1,30 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { Check, Search, X } from "lucide-react";
+import { Check, Package, Search, X } from "lucide-react";
 import { searchGoodsByKeyword } from "@/features/goods/api";
 import type { GoodsSummary } from "@/types/domain";
+
+function GoodsThumbnail({ goods }: { goods: GoodsSummary }) {
+  const imageUrl = goods.imageUrls[0];
+
+  return (
+    <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/10 bg-white/5 text-muted-foreground">
+      <Package size={15} aria-hidden="true" />
+      {imageUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={(event) => { event.currentTarget.style.display = "none"; }}
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
+    </div>
+  );
+}
 
 export function ExistingGoodsSelector({
   registeredGoodsIds,
@@ -59,9 +80,12 @@ export function ExistingGoodsSelector({
           선택한 굿즈 <span className="text-red-400">*</span>
         </label>
         <div className="flex items-center justify-between gap-3 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2.5">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{value.name}</p>
-            <p className="truncate text-[11px] text-muted-foreground">{value.animationTitle}</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <GoodsThumbnail goods={value} />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{value.name}</p>
+              <p className="truncate text-[11px] text-muted-foreground">{value.animationTitle}</p>
+            </div>
           </div>
           <button type="button" onClick={() => onChange(null)} aria-label="선택 취소" className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground">
             <X size={14} />
@@ -114,9 +138,12 @@ export function ExistingGoodsSelector({
                   onClick={() => onChange(goods)}
                   className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold text-foreground">{goods.name}</span>
-                    <span className="block truncate text-[11px] text-muted-foreground">{goods.animationTitle}</span>
+                  <span className="flex min-w-0 items-center gap-3">
+                    <GoodsThumbnail goods={goods} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-semibold text-foreground">{goods.name}</span>
+                      <span className="block truncate text-[11px] text-muted-foreground">{goods.animationTitle}</span>
+                    </span>
                   </span>
                   {registered && (
                     <span className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-muted-foreground">
