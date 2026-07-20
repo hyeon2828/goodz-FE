@@ -42,6 +42,10 @@ export function createStoreGoods(storeId: number, input: { animationId: number; 
   return callAuthenticatedRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods/new`, { method: "POST", body: JSON.stringify(input) });
 }
 
+export function addExistingStoreGoods(storeId: number, input: { goodsId: number; price: number; stock: number }) {
+  return callAuthenticatedRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods`, { method: "POST", body: JSON.stringify(input) });
+}
+
 export function updateStoreGoods(storeId: number, storeGoodsId: number, input: { price: number; stock: number; imagePath?: string }) {
   return callAuthenticatedRoute<StoreGoodsItem>(`/api/stores/${storeId}/goods/${storeGoodsId}`, { method: "PATCH", body: JSON.stringify(input) });
 }

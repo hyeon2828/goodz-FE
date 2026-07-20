@@ -10,15 +10,16 @@ import { getAnimations } from "@/features/goods/api";
 import { getStoreGoods } from "@/features/store/api";
 import { safeFetch } from "@/lib/apiClient";
 import {
-  addStoreAdmin, createStoreGoods, deleteStoreGoods, getStoreAdmins,
+  addExistingStoreGoods, addStoreAdmin, createStoreGoods, deleteStoreGoods, getStoreAdmins,
   removeStoreAdmin, updateStoreGoods, uploadStoreGoodsImage,
 } from "@/features/store/adminApi";
 import { useIsSubAdmin, useManagedStores } from "@/features/store/ManagedStoreProvider";
 import { DashboardAccessDenied } from "@/features/store/components/DashboardAccessDenied";
+import { ExistingGoodsSelector } from "@/features/store/components/ExistingGoodsSelector";
 import { GoodsFormFields, type GoodsFormState } from "@/features/store/components/GoodsFormFields";
 import { gradientForId } from "@/lib/gradient";
 import { fmtPrice, isValidEmail } from "@/lib/helpers";
-import type { AnimationData, StoreAdmin, StoreGoodsItem } from "@/types/domain";
+import type { AnimationData, GoodsSummary, StoreAdmin, StoreGoodsItem } from "@/types/domain";
 
 const EMPTY_GOODS_FORM: GoodsFormState = { name: "", animationName: "", price: "", stock: "" };
 
@@ -56,6 +57,7 @@ export default function AdminStoreDetailPage() {
   }, [store, isMainAdmin, userEmail]);
 
   const [goods, setGoods] = useState<StoreGoodsItem[]>([]);
+  const registeredGoodsIds = useMemo(() => new Set(goods.map((item) => item.goodsId)), [goods]);
   const [goodsLoading, setGoodsLoading] = useState(false);
   const [goodsError, setGoodsError] = useState<string | null>(null);
 
@@ -71,6 +73,8 @@ export default function AdminStoreDetailPage() {
   }, [store]);
 
   const [showGoodsForm, setShowGoodsForm] = useState(false);
+  const [goodsAddMode, setGoodsAddMode] = useState<"new" | "existing">("new");
+  const [selectedExistingGoods, setSelectedExistingGoods] = useState<GoodsSummary | null>(null);
   const [goodsForm, setGoodsForm] = useState<GoodsFormState>(EMPTY_GOODS_FORM);
   const [goodsErrors, setGoodsErrors] = useState<Record<string, string>>({});
   const [goodsImageFile, setGoodsImageFile] = useState<File | null>(null);
@@ -112,12 +116,25 @@ export default function AdminStoreDetailPage() {
 
   const validateGoods = (f: GoodsFormState, file: File | null) => {
     const errs: Record<string, string> = {};
-    if (!f.animationName.trim()) errs.animationName = "원작 작품을 입력해주세요";
-    else if (!animations.some((a) => a.title === f.animationName.trim())) errs.animationName = "목록에서 작품을 선택해주세요";
+    if (goodsAddMode === "new") {
+      if (!f.animationName.trim()) errs.animationName = "원작 작품을 입력해주세요";
+      else if (!animations.some((a) => a.title === f.animationName.trim())) errs.animationName = "목록에서 작품을 선택해주세요";
+    } else if (!selectedExistingGoods) {
+      errs.existingGoods = "등록할 굿즈를 선택해주세요";
+    }
     if (!f.price || Number(f.price) <= 0) errs.price = "가격을 입력해주세요";
     if (f.stock === "" || Number(f.stock) < 0) errs.stock = "재고 수량을 입력해주세요";
     if (!file) errs.image = "굿즈 사진을 추가해주세요";
     return errs;
+  };
+
+  const resetGoodsForm = () => {
+    setGoodsForm(EMPTY_GOODS_FORM);
+    setGoodsImageFile(null);
+    setGoodsErrors({});
+    setSelectedExistingGoods(null);
+    setGoodsAddMode("new");
+    if (goodsImageRef.current) goodsImageRef.current.value = "";
   };
 
   const handleAddAdmin = async () => {
@@ -159,16 +176,23 @@ export default function AdminStoreDetailPage() {
     setGoodsErrors(errs);
     if (Object.keys(errs).length > 0) return;
     const animation = animations.find((a) => a.title === goodsForm.animationName.trim());
-    if (!animation) return;
+    if (goodsAddMode === "new" && !animation) return;
+    if (goodsAddMode === "existing" && !selectedExistingGoods) return;
 
     setCreatingGoods(true);
     setCreatingGoodsStep("saving");
-    const createResult = await createStoreGoods(store.id, {
-      animationId: animation.id,
-      name: goodsForm.name.trim() || `${goodsForm.animationName.trim()} 상품`,
-      price: Number(goodsForm.price),
-      stock: Number(goodsForm.stock),
-    });
+    const createResult = goodsAddMode === "existing"
+      ? await addExistingStoreGoods(store.id, {
+          goodsId: selectedExistingGoods!.id,
+          price: Number(goodsForm.price),
+          stock: Number(goodsForm.stock),
+        })
+      : await createStoreGoods(store.id, {
+          animationId: animation!.id,
+          name: goodsForm.name.trim() || `${goodsForm.animationName.trim()} 상품`,
+          price: Number(goodsForm.price),
+          stock: Number(goodsForm.stock),
+        });
     if (!createResult.success || !createResult.data) {
       setCreatingGoods(false);
       setCreatingGoodsStep("idle");
@@ -190,11 +214,8 @@ export default function AdminStoreDetailPage() {
 
     setCreatingGoods(false);
     setCreatingGoodsStep("idle");
-    setGoodsForm(EMPTY_GOODS_FORM);
-    setGoodsImageFile(null);
-    setGoodsErrors({});
+    resetGoodsForm();
     setShowGoodsForm(false);
-    if (goodsImageRef.current) goodsImageRef.current.value = "";
   };
 
   const openEditGoods = (g: StoreGoodsItem) => {
@@ -420,7 +441,26 @@ export default function AdminStoreDetailPage() {
 
           {showGoodsForm && (
             <div className="bg-background border border-violet-500/20 rounded-xl p-4 mb-4">
-              <h3 className="font-bold text-foreground text-xs mb-4">새 굿즈 등록</h3>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="font-bold text-foreground text-xs">굿즈 등록</h3>
+                <div className="flex rounded-lg border border-border bg-card p-0.5">
+                  {([["new", "새 굿즈"], ["existing", "기존 굿즈"]] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={goodsAddMode === mode}
+                      onClick={() => {
+                        setGoodsAddMode(mode);
+                        setSelectedExistingGoods(null);
+                        setGoodsErrors({});
+                      }}
+                      className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors ${goodsAddMode === mode ? "bg-violet-600 text-white" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <GoodsFormFields
                 form={goodsForm}
                 setForm={setGoodsForm}
@@ -430,6 +470,17 @@ export default function AdminStoreDetailPage() {
                 setImageFile={setGoodsImageFile}
                 imageRef={goodsImageRef}
                 animations={animations}
+                identityFields={goodsAddMode === "existing" ? (
+                  <ExistingGoodsSelector
+                    registeredGoodsIds={registeredGoodsIds}
+                    value={selectedExistingGoods}
+                    onChange={(selected) => {
+                      setSelectedExistingGoods(selected);
+                      setGoodsErrors((errors) => ({ ...errors, existingGoods: "" }));
+                    }}
+                    error={goodsErrors.existingGoods}
+                  />
+                ) : undefined}
               />
               <div className="flex gap-2 mt-4">
                 <button
@@ -442,9 +493,7 @@ export default function AdminStoreDetailPage() {
                 <button
                   onClick={() => {
                     setShowGoodsForm(false);
-                    setGoodsErrors({});
-                    setGoodsForm(EMPTY_GOODS_FORM);
-                    setGoodsImageFile(null);
+                    resetGoodsForm();
                   }}
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 text-muted-foreground text-sm rounded-lg transition-colors"
                 >
