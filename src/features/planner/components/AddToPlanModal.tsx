@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { format } from "date-fns";
 import { Sparkles } from "lucide-react";
 import { gradientForId } from "@/lib/gradient";
@@ -15,6 +15,7 @@ export function AddToPlanModal({ item, onClose, onSuccess }: { item: PendingPlan
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const submittingRef = useRef(false);
   const plansForDate = plans.filter((p) => p.date === date);
 
   const handleDateChange = (d: string) => {
@@ -31,28 +32,34 @@ export function AddToPlanModal({ item, onClose, onSuccess }: { item: PendingPlan
   };
 
   const handleConfirm = async () => {
+    if (submittingRef.current) return;
+
     setError("");
-    if (mode === "new") {
-      if (!title.trim()) return;
-      setSubmitting(true);
-      const result = await createPlanWithEntry(title.trim(), date, item);
-      setSubmitting(false);
+    if (mode === "new" && !title.trim()) return;
+    if (mode === "existing" && !selectedPlanId) return;
+
+    submittingRef.current = true;
+    setSubmitting(true);
+
+    try {
+      const result = mode === "new"
+        ? await createPlanWithEntry(title.trim(), date, item)
+        : await addEntryToPlan(selectedPlanId!, date, item);
+
       if (!result.success) {
+        submittingRef.current = false;
         setError(result.message);
         return;
       }
-    } else {
-      if (!selectedPlanId) return;
-      setSubmitting(true);
-      const result = await addEntryToPlan(selectedPlanId, date, item);
+
+      onClose();
+      onSuccess?.(date);
+    } catch {
+      submittingRef.current = false;
+      setError("플랜 담기에 실패했습니다.");
+    } finally {
       setSubmitting(false);
-      if (!result.success) {
-        setError(result.message);
-        return;
-      }
     }
-    onClose();
-    onSuccess?.(date);
   };
 
   return (
@@ -134,7 +141,11 @@ export function AddToPlanModal({ item, onClose, onSuccess }: { item: PendingPlan
         )}
         {error && <p className="text-xs text-red-400 mb-3 leading-relaxed">{error}</p>}
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 text-muted-foreground text-sm rounded-xl transition-colors font-medium">
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="flex-1 py-2.5 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed text-muted-foreground text-sm rounded-xl transition-colors font-medium"
+          >
             취소
           </button>
           <button
