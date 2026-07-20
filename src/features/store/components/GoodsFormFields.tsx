@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useEffect, useMemo, type Dispatch, type ReactNode, type RefObject, type SetStateAction } from "react";
 import { Plus, X } from "lucide-react";
 import type { AnimationData } from "@/types/domain";
 import { AnimCombobox } from "./AnimCombobox";
@@ -21,6 +21,7 @@ export function GoodsFormFields({
   setImageFile,
   imageRef,
   animations,
+  identityFields,
 }: {
   form: GoodsFormState;
   setForm: Dispatch<SetStateAction<GoodsFormState>>;
@@ -30,6 +31,7 @@ export function GoodsFormFields({
   setImageFile: (v: File | null) => void;
   imageRef: RefObject<HTMLInputElement | null>;
   animations: AnimationData[];
+  identityFields?: ReactNode;
 }) {
   const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile]);
   useEffect(() => {
@@ -90,29 +92,35 @@ export function GoodsFormFields({
         {errors.image && <p className="text-[11px] text-red-400 mt-1 font-medium">{errors.image}</p>}
       </div>
       <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="sm:col-span-2">
-          <label className="text-xs text-muted-foreground mb-1.5 block font-medium">굿즈명</label>
-          <input
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="예) 탄지로 아크릴 스탠드 한정판"
-            className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 transition-colors"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
-            원작 작품 <span className="text-red-400">*</span>
-          </label>
-          <AnimCombobox
-            value={form.animationName}
-            onChange={(v) => {
-              setForm((f) => ({ ...f, animationName: v }));
-              setErrors((e) => ({ ...e, animationName: "" }));
-            }}
-            animations={animations}
-          />
-          {errors.animationName && <p className="text-[11px] text-red-400 mt-1 font-medium">{errors.animationName}</p>}
-        </div>
+        {identityFields ? (
+          <div className="sm:col-span-2">{identityFields}</div>
+        ) : (
+          <>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">굿즈명</label>
+              <input
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="예) 탄지로 아크릴 스탠드 한정판"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
+                원작 작품 <span className="text-red-400">*</span>
+              </label>
+              <AnimCombobox
+                value={form.animationName}
+                onChange={(v) => {
+                  setForm((f) => ({ ...f, animationName: v }));
+                  setErrors((e) => ({ ...e, animationName: "" }));
+                }}
+                animations={animations}
+              />
+              {errors.animationName && <p className="text-[11px] text-red-400 mt-1 font-medium">{errors.animationName}</p>}
+            </div>
+          </>
+        )}
         <div>
           <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
             가격 (원) <span className="text-red-400">*</span>
