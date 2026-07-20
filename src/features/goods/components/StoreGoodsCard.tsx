@@ -19,6 +19,8 @@ export function StoreGoodsCard({
   onLoginPrompt: () => void;
 }) {
   const [state, setState] = useState<"idle" | "added">("idle");
+  const [failedImagePath, setFailedImagePath] = useState<string | null>(null);
+  const showImage = Boolean(item.imagePath) && failedImagePath !== item.imagePath;
 
   const handleAdd = () => {
     if (!isLoggedIn) {
@@ -32,9 +34,23 @@ export function StoreGoodsCard({
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden transition-all duration-300 hover:border-violet-500/30 hover:shadow-xl hover:shadow-violet-950/20 group">
-      <div className={`relative h-36 sm:h-44 bg-gradient-to-br ${gradientForId(item.goodsId)} flex items-center justify-center overflow-hidden`}>
-        <div className="absolute inset-0 bg-black/10" />
-        <Sparkles size={40} className="text-white/70 opacity-80 group-hover:scale-110 transition-transform duration-300 drop-shadow-lg" />
+      <div className={`relative flex h-36 items-center justify-center overflow-hidden sm:h-44 ${showImage ? "bg-white" : `bg-gradient-to-br ${gradientForId(item.goodsId)}`}`}>
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.imagePath!}
+            alt={item.goodsName}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedImagePath(item.imagePath)}
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-black/10" />
+            <Sparkles size={40} className="text-white/70 opacity-80 group-hover:scale-110 transition-transform duration-300 drop-shadow-lg" />
+          </>
+        )}
         <div className="absolute top-2 right-2">
           <StockBadge stock={item.stock} />
         </div>
