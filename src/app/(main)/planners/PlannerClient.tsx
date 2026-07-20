@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format,
-  isSameDay, isSameMonth, isToday, startOfMonth, startOfWeek, subMonths,
+  isSameDay, isSameMonth, isToday, isValid, parseISO, startOfMonth, startOfWeek, subMonths,
 } from "date-fns";
 import { Bookmark, ChevronLeft, ChevronRight, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { LoginPromptModal } from "@/components/common/LoginPromptModal";
@@ -16,6 +16,12 @@ import { fmtPrice } from "@/lib/helpers";
 import type { PlanEntry } from "@/types/domain";
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function parsePlannerDate(value?: string) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = parseISO(value);
+  return isValid(parsed) && format(parsed, "yyyy-MM-dd") === value ? parsed : null;
+}
 
 function PlannerCalendar({
   currentMonth,
@@ -99,14 +105,15 @@ function PlannerCalendar({
   );
 }
 
-export function PlannerClient() {
+export function PlannerClient({ initialDate }: { initialDate?: string }) {
   const router = useRouter();
   const { loggedIn } = useAuth();
   const { plans, totalPlans, visitDays, removePlan, removeEntry, createEmptyPlan } = usePlanner();
 
   const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today);
-  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const startingDate = parsePlannerDate(initialDate) ?? today;
+  const [currentMonth, setCurrentMonth] = useState(startingDate);
+  const [selectedDate, setSelectedDate] = useState<Date>(startingDate);
   const [showCal, setShowCal] = useState(false);
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState("");
