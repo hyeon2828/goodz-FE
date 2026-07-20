@@ -42,7 +42,7 @@ export function ExploreClient({
   const [tab, setTab] = useState<"goods" | "stores">("goods");
   const [showFilters, setShowFilters] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const [detailGoodsId, setDetailGoodsId] = useState<number | null>(null);
+  const [detailGoods, setDetailGoods] = useState<GoodsSummary | null>(null);
   const [pendingItem, setPendingItem] = useState<PendingPlanItem | null>(null);
 
   const [goods, setGoods] = useState(initialGoods);
@@ -262,8 +262,8 @@ export function ExploreClient({
             message={"플래너에 굿즈를 담으려면\n로그인 또는 회원가입이 필요합니다"}
           />
         )}
-        {detailGoodsId !== null && (
-          <GoodsDetailModal goodsId={detailGoodsId} onAdd={(item) => setPendingItem(item)} onClose={() => setDetailGoodsId(null)} />
+        {detailGoods && (
+          <GoodsDetailModal goodsId={detailGoods.id} imageUrls={detailGoods.imageUrls} onAdd={(item) => setPendingItem(item)} onClose={() => setDetailGoods(null)} />
         )}
         {pendingItem && <AddToPlanModal item={pendingItem} onClose={() => setPendingItem(null)} />}
 
@@ -285,7 +285,7 @@ export function ExploreClient({
                         setShowLoginPrompt(true);
                         return;
                       }
-                      setDetailGoodsId(g.id);
+                      setDetailGoods(g);
                     }}
                   />
                 ))}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, MapPin, Plus, Sparkles, X } from "lucide-react";
+import { CheckCircle, ChevronLeft, ChevronRight, MapPin, Plus, Sparkles, X } from "lucide-react";
+import { Carousel, type CarouselApi, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { fmtPrice } from "@/lib/helpers";
 import { gradientForId } from "@/lib/gradient";
 import type { GoodsStoreOffer, PendingPlanItem } from "@/types/domain";
@@ -10,10 +11,12 @@ import { StockBadge } from "./StockBadge";
 
 export function GoodsDetailModal({
   goodsId,
+  imageUrls,
   onAdd,
   onClose,
 }: {
   goodsId: number;
+  imageUrls: string[];
   onAdd: (item: PendingPlanItem) => void;
   onClose: () => void;
 }) {
@@ -22,6 +25,22 @@ export function GoodsDetailModal({
   const [stores, setStores] = useState<GoodsStoreOffer[]>([]);
   const [error, setError] = useState("");
   const [addedStoreGoodsId, setAddedStoreGoodsId] = useState<number | null>(null);
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+  const [currentImage, setCurrentImage] = useState(0);
+
+  useEffect(() => {
+    if (!carouselApi) return;
+
+    const updateCurrentImage = () => setCurrentImage(carouselApi.selectedScrollSnap());
+    updateCurrentImage();
+    carouselApi.on("select", updateCurrentImage);
+    carouselApi.on("reInit", updateCurrentImage);
+
+    return () => {
+      carouselApi.off("select", updateCurrentImage);
+      carouselApi.off("reInit", updateCurrentImage);
+    };
+  }, [carouselApi]);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +73,8 @@ export function GoodsDetailModal({
     setTimeout(() => setAddedStoreGoodsId(null), 2000);
   };
 
+  const hasMultipleImages = imageUrls.length > 1;
+
   return (
     <div
       className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6"
@@ -63,12 +84,53 @@ export function GoodsDetailModal({
         className="bg-card border border-border rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`relative h-32 sm:h-40 bg-gradient-to-br ${gradientForId(goodsId)} flex items-center justify-center shrink-0`}>
-          <div className="absolute inset-0 bg-black/10" />
-          <Sparkles size={48} className="text-white/70 drop-shadow-xl" />
+        <div className="relative shrink-0">
+          {imageUrls.length > 0 ? (
+            <Carousel setApi={setCarouselApi} opts={{ loop: hasMultipleImages }} className="group h-32 sm:h-40">
+              <CarouselContent className="ml-0 h-32 sm:h-40">
+                {imageUrls.map((imageUrl, index) => (
+                  <CarouselItem key={`${imageUrl}-${index}`} className="h-32 pl-0 sm:h-40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageUrl} alt={`${name ?? "굿즈"} 이미지 ${index + 1}`} className="h-full w-full object-cover" />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              {hasMultipleImages && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="이전 이미지"
+                    onClick={() => carouselApi?.scrollPrev()}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/55 p-1 text-white transition-opacity hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="다음 이미지"
+                    onClick={() => carouselApi?.scrollNext()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/55 p-1 text-white transition-opacity hover:bg-black/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white" aria-hidden="true">
+                    {currentImage + 1} / {imageUrls.length}
+                  </div>
+                  <span className="sr-only" aria-live="polite">
+                    {imageUrls.length}개 이미지 중 {currentImage + 1}번째
+                  </span>
+                </>
+              )}
+            </Carousel>
+          ) : (
+            <div className={`h-32 sm:h-40 bg-gradient-to-br ${gradientForId(goodsId)} flex items-center justify-center`}>
+              <div className="absolute inset-0 bg-black/10" />
+              <Sparkles size={48} className="text-white/70 drop-shadow-xl" />
+            </div>
+          )}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+            className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
           >
             <X size={15} />
           </button>
